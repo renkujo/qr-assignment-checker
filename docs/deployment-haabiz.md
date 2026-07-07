@@ -38,7 +38,7 @@ Build settings:
 
 ```txt
 Dockerfile path: Dockerfile.pocketbase
-Port: 8090
+Internal port: 8090
 Health path: /api/health
 ```
 
@@ -82,7 +82,7 @@ Build settings:
 
 ```txt
 Dockerfile path: Dockerfile
-Port: 3000
+Internal port: 3000
 ```
 
 Environment variables:
