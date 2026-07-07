@@ -1,0 +1,17 @@
+{
+	"name": "QR Assignment Checker",
+	"short_name": "QR Checker",
+	"description": "ระบบเช็คการส่งงานด้วย QR Code สำหรับครู",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#f8fafc",
+	"theme_color": "#2563eb",
+	"icons": [
+		{
+			"src": "/app-icon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		}
+	]
+}
