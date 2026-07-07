@@ -1,0 +1,15 @@
+.git
+.letta
+node_modules
+build
+.svelte-kit
+.pnpm-store
+.DS_Store
+.env
+.env.*
+!.env.example
+!.env.production.example
+pocketbase/pb_data
+playwright-report
+test-results
+coverage

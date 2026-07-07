@@ -1,4 +1,5 @@
-import { env } from '$env/dynamic/public';
+import { env as privateEnv } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
 import PocketBase, { type AuthRecord } from 'pocketbase';
 
 const defaultPocketBaseUrl = 'http://127.0.0.1:8090';
@@ -17,7 +18,9 @@ export interface ISerializedAuthUser {
 export const createServerPocketBase = ({
 	cookie
 }: ICreateServerPocketBaseInput = {}): PocketBase => {
-	const pb = new PocketBase(env.PUBLIC_POCKETBASE_URL || defaultPocketBaseUrl);
+	const pb = new PocketBase(
+		privateEnv.POCKETBASE_URL || publicEnv.PUBLIC_POCKETBASE_URL || defaultPocketBaseUrl
+	);
 	pb.authStore.loadFromCookie(cookie || '');
 
 	return pb;

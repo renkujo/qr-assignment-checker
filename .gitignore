@@ -22,6 +22,7 @@ vite.config.ts.timestamp-*
 .env
 .env.*
 !.env.example
+!.env.production.example
 !.env.test
 
 # local tools

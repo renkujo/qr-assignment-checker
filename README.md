@@ -71,7 +71,7 @@ pnpm smoke:mvp
 
 This creates disposable local test records in `pocketbase/pb_data` and verifies direct submission writes are blocked, scan submit/duplicate works, summary realtime receives change events, CSV export works, and close/reopen assignment behavior is enforced.
 
-Copy `.env.example` to `.env` and set `PUBLIC_POCKETBASE_URL` when PocketBase is running.
+Copy `.env.example` to `.env` and set `POCKETBASE_URL` / `PUBLIC_POCKETBASE_URL` when PocketBase is running.
 
 ## PocketBase local readiness
 

@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+
+FROM alpine:3.22
+ARG PB_VERSION=0.39.5
+ARG TARGETARCH
+RUN apk add --no-cache ca-certificates unzip wget \
+	&& case "$TARGETARCH" in \
+		"amd64") PB_ARCH="amd64" ;; \
+		"arm64") PB_ARCH="arm64" ;; \
+		*) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
+	esac \
+	&& wget -O /tmp/pocketbase.zip "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${PB_ARCH}.zip" \
+	&& unzip /tmp/pocketbase.zip -d /usr/local/bin \
+	&& rm /tmp/pocketbase.zip \
+	&& chmod +x /usr/local/bin/pocketbase
+
+WORKDIR /pb
+COPY pocketbase/pb_migrations ./pb_migrations
+COPY pocketbase/pb_hooks ./pb_hooks
+VOLUME ["/pb/pb_data"]
+EXPOSE 8090
+CMD ["sh", "-c", "pocketbase migrate up --dir=/pb/pb_data --migrationsDir=/pb/pb_migrations && exec pocketbase serve --http=0.0.0.0:8090 --dir=/pb/pb_data --migrationsDir=/pb/pb_migrations --hooksDir=/pb/pb_hooks"]
