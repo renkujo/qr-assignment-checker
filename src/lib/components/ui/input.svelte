@@ -13,10 +13,10 @@
 
 <style>
 	.ui-input {
-		min-height: 46px;
+		min-height: 44px;
 		width: 100%;
 		border: 1px solid var(--qc-border-strong);
-		border-radius: var(--qc-radius-sm);
+		border-radius: var(--qc-radius-md);
 		background: #ffffff;
 		padding: 0 12px;
 		color: var(--qc-text);
@@ -25,7 +25,7 @@
 
 	.ui-input:focus {
 		border-color: var(--qc-primary);
-		box-shadow: 0 0 0 4px rgba(23, 107, 77, 0.12);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--qc-primary) 14%, transparent);
 		outline: 0;
 	}
 </style>

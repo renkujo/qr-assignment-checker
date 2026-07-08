@@ -17,6 +17,6 @@
 		display: grid;
 		gap: 7px;
 		color: var(--qc-text);
-		font-weight: 700;
+		font-weight: 600;
 	}
 </style>

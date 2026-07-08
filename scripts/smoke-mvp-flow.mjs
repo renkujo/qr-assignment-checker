@@ -201,6 +201,39 @@ const setAssignmentStatus = async ({ assignmentId, cookie, status }) => {
 	});
 };
 
+const assertStudentImport = async ({ pb, classRecord, cookie }) => {
+	const formData = new URLSearchParams();
+	formData.set(
+		'importText',
+		'เลขที่,ชื่อ-นามสกุล\n3,MVP Import สาม\n4,MVP Import สี่\n1,MVP เลขซ้ำ\n,ไม่มีเลขที่'
+	);
+
+	const response = await fetch(`${appUrl}/app/students?/import`, {
+		method: 'POST',
+		headers: {
+			accept: 'text/html',
+			'content-type': 'application/x-www-form-urlencoded',
+			cookie
+		},
+		body: formData,
+		redirect: 'manual'
+	});
+
+	assert(response.status === 200, `Expected import action 200, got ${response.status}`);
+
+	const students = await pb.collection('students').getFullList({
+		filter: pb.filter('class = {:classId} && active = true', { classId: classRecord.id }),
+		sort: 'student_no'
+	});
+	const studentNumbers = students.map((student) => String(student.student_no));
+	const importedStudent = students.find((student) => student.student_no === '3');
+
+	assert(students.length === 4, `Expected 4 students after import, got ${students.length}`);
+	assert(studentNumbers.includes('3'), 'Expected imported student number 3');
+	assert(studentNumbers.includes('4'), 'Expected imported student number 4');
+	assert(importedStudent?.qr_token, 'Expected imported student to have qr_token');
+};
+
 const assertDirectCreateBlocked = async ({
 	pb,
 	assignment,
@@ -307,6 +340,7 @@ const main = async () => {
 	const cookie = createAuthCookie(pb);
 	const qrPayload = `student:${fixture.submittedToken}`;
 
+	await assertStudentImport({ pb, classRecord: fixture.classRecord, cookie });
 	await assertDirectCreateBlocked({ pb, ...fixture });
 
 	const firstScan = await assertRealtimeChange({
@@ -387,6 +421,7 @@ const main = async () => {
 				submittedStudentId: fixture.submittedStudent.id,
 				missingStudentId: fixture.missingStudent.id,
 				checks: [
+					'student-import',
 					'direct-create-blocked',
 					'scan-submitted',
 					'scan-duplicate',

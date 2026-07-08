@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Card } from '$lib/components/ui';
+	import { Card, LinkButton } from '$lib/components/ui';
 </script>
 
 <svelte:head>
@@ -31,8 +31,8 @@
 		</div>
 
 		<div class="hero-actions">
-			<a class="primary-link" href={resolve('/login')}>เข้าสู่ระบบครู</a>
-			<a class="secondary-link" href={resolve('/app')}>ไปที่ workspace</a>
+			<LinkButton variant="primary" size="lg" href={resolve('/login')}>เข้าสู่ระบบครู</LinkButton>
+			<LinkButton variant="secondary" size="lg" href={resolve('/app')}>ไปที่ workspace</LinkButton>
 		</div>
 	</Card>
 </main>
@@ -56,7 +56,7 @@
 		margin: 0 0 10px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
@@ -110,44 +110,12 @@
 		margin-top: 26px;
 	}
 
-	.hero-actions a {
-		display: inline-flex;
-		min-height: 46px;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--qc-radius-sm);
-		padding: 0 16px;
-		font-weight: 750;
-		text-decoration: none;
-	}
-
-	.primary-link {
-		border: 1px solid var(--qc-primary);
-		background: var(--qc-primary);
-		color: #ffffff;
-	}
-
-	.primary-link:hover {
-		background: var(--qc-primary-strong);
-	}
-
-	.secondary-link {
-		border: 1px solid var(--qc-border-strong);
-		background: var(--qc-surface);
-		color: var(--qc-primary);
-	}
-
-	.secondary-link:hover {
-		border-color: var(--qc-primary);
-		background: var(--qc-primary-soft);
-	}
-
 	@media (max-width: 680px) {
 		.feature-grid {
 			grid-template-columns: 1fr;
 		}
 
-		.hero-actions a {
+		:global(.hero-actions .ui-link-button) {
 			width: 100%;
 		}
 	}

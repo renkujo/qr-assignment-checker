@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Alert, Button, Card, Input, Label } from '$lib/components/ui';
+	import { Alert, Button, Card, Input, Label, LinkButton } from '$lib/components/ui';
 
 	let { data, form } = $props();
 </script>
@@ -11,7 +11,7 @@
 
 <main class="auth-shell">
 	<Card class="auth-card" aria-labelledby="login-title">
-		<a class="back-link" href={resolve('/')}>← กลับหน้าแรก</a>
+		<LinkButton variant="ghost" href={resolve('/')}>← กลับหน้าแรก</LinkButton>
 
 		<div class="auth-heading">
 			<p class="section-kicker">สำหรับครู</p>
@@ -56,19 +56,6 @@
 		padding: clamp(22px, 5vw, 32px);
 	}
 
-	.back-link {
-		display: inline-flex;
-		width: fit-content;
-		color: var(--qc-primary);
-		font-size: 0.9rem;
-		font-weight: 700;
-		text-decoration: none;
-	}
-
-	.back-link:hover {
-		color: var(--qc-primary-strong);
-	}
-
 	.auth-heading {
 		margin-top: 28px;
 	}
@@ -77,7 +64,7 @@
 		margin: 0 0 8px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 

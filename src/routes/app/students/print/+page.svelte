@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Alert, Button, Card } from '$lib/components/ui';
+	import { Alert, Button, Card, LinkButton } from '$lib/components/ui';
 
 	let { data } = $props();
 </script>
@@ -12,7 +12,7 @@
 <main class="print-shell">
 	<Card class="print-toolbar" aria-label="เครื่องมือพิมพ์">
 		<div>
-			<a href={resolve('/app/students')}>← กลับรายชื่อนักเรียน</a>
+			<LinkButton variant="ghost" href={resolve('/app/students')}>← กลับรายชื่อนักเรียน</LinkButton>
 			<p class="section-kicker">การ์ด QR</p>
 			<h1>พิมพ์ QR นักเรียน</h1>
 			{#if data.classRecord}
@@ -69,24 +69,11 @@
 		padding: clamp(18px, 4vw, 30px);
 	}
 
-	:global(.print-toolbar.ui-card) a {
-		display: inline-flex;
-		width: fit-content;
-		color: var(--qc-primary);
-		font-size: 0.9rem;
-		font-weight: 700;
-		text-decoration: none;
-	}
-
-	:global(.print-toolbar.ui-card) a:hover {
-		color: var(--qc-primary-strong);
-	}
-
 	.section-kicker {
 		margin: 24px 0 8px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
@@ -128,7 +115,7 @@
 	.card-heading span {
 		color: var(--qc-primary);
 		font-size: 0.85rem;
-		font-weight: 800;
+		font-weight: 600;
 	}
 
 	.card-heading strong {

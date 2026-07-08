@@ -15,8 +15,8 @@
 <style>
 	.ui-card {
 		border: 1px solid var(--qc-border);
-		border-radius: var(--qc-radius-md);
-		background: color-mix(in srgb, var(--qc-surface) 94%, white);
+		border-radius: var(--qc-radius-lg);
+		background: var(--qc-surface);
 		box-shadow: var(--qc-shadow);
 	}
 </style>

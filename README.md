@@ -73,6 +73,18 @@ This creates disposable local test records in `pocketbase/pb_data` and verifies 
 
 Copy `.env.example` to `.env` and set `POCKETBASE_URL` / `PUBLIC_POCKETBASE_URL` when PocketBase is running.
 
+## Import student roster
+
+The student roster page supports paste-based CSV/TSV import. Teachers can copy two columns from Excel or Google Sheets and paste them into `/app/students`:
+
+```txt
+เลขที่,ชื่อ-นามสกุล
+1,เด็กชายเอ
+2,เด็กหญิงบี
+```
+
+The MVP imports up to 100 rows at a time, skips empty rows, and skips duplicate student numbers without changing existing QR tokens.
+
 ## PocketBase local readiness
 
 Check whether PocketBase is installed:

@@ -18,9 +18,10 @@
 		width: fit-content;
 		align-items: center;
 		border-radius: 999px;
-		padding: 5px 9px;
-		font-size: 0.78rem;
-		font-weight: 750;
+		padding: 4px 10px;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
 		line-height: 1;
 		white-space: nowrap;
 	}

@@ -17,7 +17,7 @@
 		border: 1px solid var(--qc-border);
 		border-radius: var(--qc-radius-sm);
 		padding: 12px 14px;
-		font-weight: 700;
+		font-weight: 500;
 		line-height: 1.5;
 	}
 

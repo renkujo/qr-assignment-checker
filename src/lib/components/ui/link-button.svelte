@@ -1,43 +1,38 @@
 <script lang="ts">
-	interface IButtonProps {
+	import type { HTMLAnchorAttributes } from 'svelte/elements';
+
+	interface ILinkButtonProps extends HTMLAnchorAttributes {
 		children: import('svelte').Snippet;
-		type?: 'button' | 'submit' | 'reset';
-		variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+		variant?: 'primary' | 'secondary' | 'ghost';
 		size?: 'md' | 'lg';
-		disabled?: boolean;
 		class?: string;
-		onclick?: (event: MouseEvent) => void;
 	}
 
 	let {
 		children,
-		type = 'button',
-		variant = 'primary',
+		variant = 'secondary',
 		size = 'md',
-		disabled = false,
 		class: className = '',
-		onclick
-	}: IButtonProps = $props();
+		...restProps
+	}: ILinkButtonProps = $props();
 </script>
 
-<button
-	class={[`ui-button ui-button--${variant} ui-button--${size}`, className]}
-	{type}
-	{disabled}
-	{onclick}
+<a
+	class={[`ui-link-button ui-link-button--${variant} ui-link-button--${size}`, className]}
+	{...restProps}
 >
 	{@render children()}
-</button>
+</a>
 
 <style>
-	.ui-button {
+	.ui-link-button {
 		display: inline-flex;
+		width: fit-content;
 		align-items: center;
 		justify-content: center;
 		border: 1px solid transparent;
 		border-radius: var(--qc-radius-md);
 		padding: 0 16px;
-		font: inherit;
 		font-weight: 500;
 		line-height: 1;
 		text-decoration: none;
@@ -45,50 +40,46 @@
 		cursor: pointer;
 	}
 
-	.ui-button--md {
+	.ui-link-button--md {
 		min-height: 40px;
 	}
 
-	.ui-button--lg {
+	.ui-link-button--lg {
 		min-height: 44px;
 		padding-inline: 20px;
 	}
 
-	.ui-button--primary {
+	.ui-link-button--primary {
 		border-color: var(--qc-primary);
 		background: var(--qc-primary);
 		color: #ffffff;
 	}
 
-	.ui-button--primary:hover:not(:disabled) {
+	.ui-link-button--primary:hover {
 		background: var(--qc-primary-strong);
 	}
 
-	.ui-button--secondary {
+	.ui-link-button--secondary {
 		border-color: var(--qc-border-strong);
 		background: var(--qc-surface);
 		color: var(--qc-text);
 	}
 
-	.ui-button--secondary:hover:not(:disabled) {
+	.ui-link-button--secondary:hover {
 		border-color: var(--qc-primary);
 		background: var(--qc-primary-soft);
+		color: var(--qc-primary-strong);
 	}
 
-	.ui-button--danger {
-		border-color: color-mix(in srgb, var(--qc-danger) 28%, white);
-		background: var(--qc-danger-soft);
-		color: var(--qc-danger);
-	}
-
-	.ui-button--ghost {
+	.ui-link-button--ghost {
+		min-height: auto;
 		border-color: transparent;
 		background: transparent;
+		padding: 0;
 		color: var(--qc-primary);
 	}
 
-	.ui-button:disabled {
-		cursor: not-allowed;
-		opacity: 0.55;
+	.ui-link-button--ghost:hover {
+		color: var(--qc-primary-strong);
 	}
 </style>

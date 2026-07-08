@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { Alert, Badge, Button, Card } from '$lib/components/ui';
+	import { Alert, Badge, Button, Card, LinkButton } from '$lib/components/ui';
 	import type { Html5Qrcode } from 'html5-qrcode';
 	import type { IScanSubmissionResult } from '$lib/submissions';
 
@@ -137,11 +137,12 @@
 
 <main class="scan-shell">
 	<header class="scan-hero">
-		<a
-			class="back-link"
+		<LinkButton
+			variant="ghost"
 			href={resolve('/app/assignments/[assignmentId]', { assignmentId: data.assignment.id })}
-			>← กลับสรุปงาน</a
 		>
+			← กลับสรุปงาน
+		</LinkButton>
 		<div class="hero-content">
 			<div>
 				<p class="section-kicker">สแกนส่งงาน</p>
@@ -220,19 +221,6 @@
 		box-shadow: var(--qc-shadow);
 	}
 
-	.back-link {
-		display: inline-flex;
-		width: fit-content;
-		color: var(--qc-primary);
-		font-size: 0.9rem;
-		font-weight: 700;
-		text-decoration: none;
-	}
-
-	.back-link:hover {
-		color: var(--qc-primary-strong);
-	}
-
 	.hero-content {
 		display: flex;
 		align-items: flex-end;
@@ -245,7 +233,7 @@
 		margin: 0 0 8px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
@@ -264,7 +252,7 @@
 	.scan-meta {
 		margin: 10px 0 0;
 		color: var(--qc-muted);
-		font-weight: 650;
+		font-weight: 500;
 		line-height: 1.5;
 	}
 

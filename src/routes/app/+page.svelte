@@ -67,7 +67,7 @@
 		margin: 0 0 8px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
@@ -137,7 +137,7 @@
 		padding: 5px 9px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 800;
+		font-weight: 600;
 		font-variant-numeric: tabular-nums;
 	}
 

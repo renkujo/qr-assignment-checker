@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { Alert, Badge, Button, Card } from '$lib/components/ui';
+	import { Alert, Badge, Button, Card, LinkButton } from '$lib/components/ui';
 
 	let { data, form } = $props();
 
@@ -59,7 +59,7 @@
 
 <main class="summary-shell">
 	<header class="summary-hero">
-		<a class="back-link" href={resolve('/app/assignments')}>← กลับงานที่ต้องตรวจ</a>
+		<LinkButton variant="ghost" href={resolve('/app/assignments')}>← กลับงานที่ต้องตรวจ</LinkButton>
 		<div class="hero-grid">
 			<div>
 				<p class="section-kicker">สรุปงาน</p>
@@ -77,20 +77,24 @@
 
 			<div class="hero-actions">
 				{#if data.assignment.status === 'closed'}
-					<span class="primary-action action-disabled">ปิดรับแล้ว</span>
+					<Button variant="secondary" type="button" disabled class="status-button"
+						>ปิดรับแล้ว</Button
+					>
 				{:else}
-					<a
-						class="primary-action"
+					<LinkButton
+						variant="primary"
+						class="hero-link-action"
 						href={resolve('/app/assignments/[assignmentId]/scan', {
 							assignmentId: data.assignment.id
-						})}>เริ่มสแกน</a
+						})}>เริ่มสแกน</LinkButton
 					>
 				{/if}
-				<a
-					class="secondary-action"
+				<LinkButton
+					variant="secondary"
+					class="hero-link-action"
 					href={resolve('/app/assignments/[assignmentId]/export', {
 						assignmentId: data.assignment.id
-					})}>ดาวน์โหลด CSV</a
+					})}>ดาวน์โหลด CSV</LinkButton
 				>
 				<form method="POST" action="?/setStatus" class="status-form">
 					<input
@@ -195,24 +199,6 @@
 		padding: clamp(18px, 4vw, 30px);
 	}
 
-	.back-link,
-	.primary-action,
-	.secondary-action {
-		text-decoration: none;
-	}
-
-	.back-link {
-		display: inline-flex;
-		width: fit-content;
-		color: var(--qc-primary);
-		font-size: 0.9rem;
-		font-weight: 700;
-	}
-
-	.back-link:hover {
-		color: var(--qc-primary-strong);
-	}
-
 	.hero-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(210px, auto);
@@ -225,7 +211,7 @@
 		margin: 0 0 8px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
@@ -272,46 +258,6 @@
 		justify-items: stretch;
 	}
 
-	.primary-action,
-	.secondary-action {
-		display: inline-flex;
-		min-height: 46px;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--qc-radius-sm);
-		padding: 0 16px;
-		font: inherit;
-		font-weight: 750;
-		white-space: nowrap;
-	}
-
-	.primary-action {
-		border: 1px solid var(--qc-primary);
-		background: var(--qc-primary);
-		color: #ffffff;
-	}
-
-	.primary-action:hover {
-		background: var(--qc-primary-strong);
-	}
-
-	.action-disabled {
-		border-color: var(--qc-border-strong);
-		background: var(--qc-bg-soft);
-		color: var(--qc-muted);
-	}
-
-	.secondary-action {
-		border: 1px solid var(--qc-border-strong);
-		background: var(--qc-surface);
-		color: var(--qc-primary);
-	}
-
-	.secondary-action:hover {
-		border-color: var(--qc-primary);
-		background: var(--qc-primary-soft);
-	}
-
 	.status-form {
 		margin: 0;
 	}
@@ -320,7 +266,8 @@
 		margin-top: 14px;
 	}
 
-	:global(.status-button.ui-button) {
+	:global(.status-button.ui-button),
+	:global(.hero-link-action.ui-link-button) {
 		width: 100%;
 	}
 
@@ -350,7 +297,7 @@
 	:global(.metric-card.ui-card) span {
 		margin-top: 7px;
 		color: var(--qc-muted);
-		font-weight: 750;
+		font-weight: 600;
 	}
 
 	:global(.metric-card.ui-card.submitted) strong {
@@ -469,7 +416,7 @@
 	}
 
 	.student-main span {
-		font-weight: 750;
+		font-weight: 600;
 		line-height: 1.25;
 	}
 
@@ -506,8 +453,8 @@
 		}
 
 		.hero-actions,
-		.primary-action,
-		.secondary-action {
+		:global(.hero-actions .ui-button),
+		:global(.hero-actions .ui-link-button) {
 			width: 100%;
 		}
 

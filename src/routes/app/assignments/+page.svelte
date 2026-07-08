@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Alert, Badge, Button, Input, Label } from '$lib/components/ui';
+	import { Alert, Badge, Button, Input, Label, LinkButton } from '$lib/components/ui';
 
 	let { data, form } = $props();
 
@@ -23,7 +23,7 @@
 
 <main class="assignments-shell">
 	<header class="work-hero">
-		<a class="back-link" href={resolve('/app')}>← กลับ workspace</a>
+		<LinkButton variant="ghost" href={resolve('/app')}>← กลับ workspace</LinkButton>
 		<div class="hero-grid">
 			<div>
 				<p class="section-kicker">งานในห้องเรียน</p>
@@ -37,7 +37,9 @@
 				{/if}
 			</div>
 
-			<a class="secondary-action" href={resolve('/app/students')}>จัดการรายชื่อนักเรียน</a>
+			<LinkButton variant="secondary" href={resolve('/app/students')}
+				>จัดการรายชื่อนักเรียน</LinkButton
+			>
 		</div>
 	</header>
 
@@ -137,22 +139,8 @@
 		padding: clamp(18px, 4vw, 30px);
 	}
 
-	.back-link,
-	.assignment-row,
-	.secondary-action {
+	.assignment-row {
 		text-decoration: none;
-	}
-
-	.back-link {
-		display: inline-flex;
-		width: fit-content;
-		color: var(--qc-primary);
-		font-size: 0.9rem;
-		font-weight: 700;
-	}
-
-	.back-link:hover {
-		color: var(--qc-primary-strong);
 	}
 
 	.hero-grid {
@@ -167,7 +155,7 @@
 		margin: 0 0 8px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
@@ -200,28 +188,6 @@
 		margin: 8px 0 0;
 		color: var(--qc-muted);
 		line-height: 1.55;
-	}
-
-	.secondary-action {
-		display: inline-flex;
-		min-height: 46px;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--qc-radius-sm);
-		padding: 0 16px;
-		font-weight: 750;
-	}
-
-	.secondary-action {
-		border: 1px solid var(--qc-border-strong);
-		background: var(--qc-surface);
-		color: var(--qc-primary);
-		white-space: nowrap;
-	}
-
-	.secondary-action:hover {
-		border-color: var(--qc-primary);
-		background: var(--qc-primary-soft);
 	}
 
 	.work-layout {
@@ -321,7 +287,7 @@
 		color: var(--qc-primary);
 		font-size: 0.82rem;
 		font-style: normal;
-		font-weight: 750;
+		font-weight: 600;
 	}
 
 	.empty-state {
@@ -350,7 +316,7 @@
 			grid-template-columns: 1fr;
 		}
 
-		.secondary-action {
+		:global(.hero-grid .ui-link-button) {
 			width: 100%;
 		}
 

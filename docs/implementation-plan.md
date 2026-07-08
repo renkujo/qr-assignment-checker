@@ -67,6 +67,7 @@ Student roster slice status:
 - `/app/students` lists active students for the teacher default class
 - first visit auto-creates a default class for the logged-in teacher if none exists
 - create action adds student number, full name, opaque `qr_token`, and QR payload preview
+- paste import supports CSV/TSV rows from Excel or Google Sheets, creates new students only, skips invalid rows, skips duplicate student numbers, and preserves existing QR tokens
 - print QR cards route exists at `/app/students/print`
 
 Routes:

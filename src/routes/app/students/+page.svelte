@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Alert, Badge, Button, Input, Label } from '$lib/components/ui';
+	import { Alert, Badge, Button, Input, Label, LinkButton, Textarea } from '$lib/components/ui';
 
 	let { data, form } = $props();
 
 	const studentCount = $derived(data.students.length);
+	const importResultRows = $derived(form?.importResult?.rows || []);
 </script>
 
 <svelte:head>
@@ -13,7 +14,7 @@
 
 <main class="students-shell">
 	<header class="roster-hero">
-		<a class="back-link" href={resolve('/app')}>← กลับ workspace</a>
+		<LinkButton variant="ghost" href={resolve('/app')}>← กลับ workspace</LinkButton>
 		<div class="hero-grid">
 			<div class="hero-copy">
 				<p class="section-kicker">ห้องเรียน</p>
@@ -28,8 +29,12 @@
 			</div>
 
 			<div class="hero-actions" aria-label="จัดการรายชื่อ">
-				<a class="secondary-action" href={resolve('/app/assignments')}>ดูงานที่ต้องตรวจ</a>
-				<a class="primary-action" href={resolve('/app/students/print')}>พิมพ์ QR ทั้งห้อง</a>
+				<LinkButton variant="secondary" href={resolve('/app/assignments')}
+					>ดูงานที่ต้องตรวจ</LinkButton
+				>
+				<LinkButton variant="primary" href={resolve('/app/students/print')}
+					>พิมพ์ QR ทั้งห้อง</LinkButton
+				>
 			</div>
 		</div>
 	</header>
@@ -41,34 +46,94 @@
 		</Alert>
 	{:else}
 		<section class="roster-layout">
-			<form
-				method="POST"
-				action="?/create"
-				class="student-form"
-				aria-labelledby="add-student-title"
-			>
-				<div class="panel-heading">
-					<p class="section-kicker">เพิ่มรายชื่อ</p>
-					<h2 id="add-student-title">เพิ่มนักเรียน</h2>
-					<span>ใช้เลขที่กับชื่อจริงพอสำหรับ MVP นี้</span>
-				</div>
+			<aside class="roster-tools" aria-label="เพิ่มและนำเข้ารายชื่อ">
+				<form
+					method="POST"
+					action="?/create"
+					class="student-form"
+					aria-labelledby="add-student-title"
+				>
+					<div class="panel-heading">
+						<p class="section-kicker">เพิ่มรายชื่อ</p>
+						<h2 id="add-student-title">เพิ่มนักเรียน</h2>
+						<span>ใช้เลขที่กับชื่อจริงพอสำหรับ MVP นี้</span>
+					</div>
 
-				{#if form?.message}
-					<Alert variant="danger" class="form-error">{form.message}</Alert>
-				{/if}
+					{#if form?.formName === 'create' && form?.message}
+						<Alert variant="danger" class="form-error">{form.message}</Alert>
+					{/if}
 
-				<Label>
-					<span>เลขที่</span>
-					<Input name="studentNo" value={form?.studentNo || ''} inputmode="numeric" required />
-				</Label>
+					<Label>
+						<span>เลขที่</span>
+						<Input name="studentNo" value={form?.studentNo || ''} inputmode="numeric" required />
+					</Label>
 
-				<Label>
-					<span>ชื่อ-นามสกุล</span>
-					<Input name="fullName" value={form?.fullName || ''} autocomplete="name" required />
-				</Label>
+					<Label>
+						<span>ชื่อ-นามสกุล</span>
+						<Input name="fullName" value={form?.fullName || ''} autocomplete="name" required />
+					</Label>
 
-				<Button type="submit" class="form-submit">บันทึกนักเรียน</Button>
-			</form>
+					<Button type="submit" class="form-submit">บันทึกนักเรียน</Button>
+				</form>
+
+				<form method="POST" action="?/import" class="import-form" aria-labelledby="import-title">
+					<div class="panel-heading">
+						<p class="section-kicker">นำเข้าหลายคน</p>
+						<h2 id="import-title">Import รายชื่อ</h2>
+						<span>copy จาก Excel / Google Sheets แล้ววางได้เลย สูงสุด 100 แถวต่อครั้ง</span>
+					</div>
+
+					{#if form?.formName === 'import' && form?.message}
+						<Alert
+							variant={form?.importResult?.createdCount ? 'success' : 'warning'}
+							class="form-error"
+						>
+							{form.message}
+						</Alert>
+					{/if}
+
+					<Label>
+						<span>รายชื่อที่ต้องการนำเข้า</span>
+						<Textarea
+							name="importText"
+							value={form?.formName === 'import' ? form?.importText || '' : ''}
+							placeholder="เลขที่,ชื่อ-นามสกุล\n1,เด็กชายเอ\n2,เด็กหญิงบี"
+						/>
+					</Label>
+
+					<div class="import-example" aria-label="ตัวอย่าง import">
+						<strong>รูปแบบที่รองรับ</strong>
+						<code>เลขที่,ชื่อ-นามสกุล</code>
+						<code>1,เด็กชายเอ</code>
+						<code>2,เด็กหญิงบี</code>
+					</div>
+
+					<Button type="submit" class="form-submit">นำเข้ารายชื่อ</Button>
+
+					{#if form?.formName === 'import' && form?.importResult}
+						<div class="import-result" aria-live="polite">
+							<div class="import-result-summary">
+								<Badge variant="success">เพิ่ม {form.importResult.createdCount} คน</Badge>
+								<Badge variant={form.importResult.skippedCount ? 'warning' : 'muted'}>
+									ข้าม {form.importResult.skippedCount} แถว
+								</Badge>
+							</div>
+
+							{#if importResultRows.length > 0}
+								<div class="import-result-rows">
+									{#each importResultRows.slice(0, 8) as row (row.rowNumber)}
+										<div class="import-result-row" data-status={row.status}>
+											<span>แถว {row.rowNumber}</span>
+											<strong>{row.studentNo || '—'} {row.fullName}</strong>
+											<small>{row.status === 'created' ? 'เพิ่มแล้ว' : row.reason}</small>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/if}
+				</form>
+			</aside>
 
 			<section class="student-list" aria-labelledby="student-list-title">
 				<div class="list-heading">
@@ -116,6 +181,7 @@
 
 	.roster-hero,
 	.student-form,
+	.import-form,
 	.student-list {
 		border: 1px solid var(--qc-border);
 		background: color-mix(in srgb, var(--qc-surface) 94%, white);
@@ -125,19 +191,6 @@
 	.roster-hero {
 		border-radius: var(--qc-radius-lg);
 		padding: clamp(18px, 4vw, 30px);
-	}
-
-	.back-link {
-		display: inline-flex;
-		width: fit-content;
-		color: var(--qc-primary);
-		font-size: 0.9rem;
-		font-weight: 700;
-		text-decoration: none;
-	}
-
-	.back-link:hover {
-		color: var(--qc-primary-strong);
 	}
 
 	.hero-grid {
@@ -152,7 +205,7 @@
 		margin: 0 0 8px;
 		color: var(--qc-primary);
 		font-size: 0.78rem;
-		font-weight: 700;
+		font-weight: 600;
 		letter-spacing: 0.04em;
 	}
 
@@ -195,39 +248,6 @@
 		white-space: nowrap;
 	}
 
-	.primary-action,
-	.secondary-action {
-		display: inline-flex;
-		min-height: 46px;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--qc-radius-sm);
-		padding: 0 16px;
-		font-weight: 750;
-		text-decoration: none;
-	}
-
-	.primary-action {
-		border: 1px solid var(--qc-primary);
-		background: var(--qc-primary);
-		color: #ffffff;
-	}
-
-	.primary-action:hover {
-		background: var(--qc-primary-strong);
-	}
-
-	.secondary-action {
-		border: 1px solid var(--qc-border-strong);
-		background: var(--qc-surface);
-		color: var(--qc-primary);
-	}
-
-	.secondary-action:hover {
-		border-color: var(--qc-primary);
-		background: var(--qc-primary-soft);
-	}
-
 	.roster-layout {
 		display: grid;
 		grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
@@ -236,17 +256,24 @@
 	}
 
 	.student-form,
+	.import-form,
 	.student-list {
 		border-radius: var(--qc-radius-md);
 		padding: 18px;
 	}
 
-	.student-form {
+	.roster-tools {
 		display: grid;
-		align-content: start;
 		gap: 15px;
+		align-content: start;
 		position: sticky;
 		top: 16px;
+	}
+
+	.student-form,
+	.import-form {
+		display: grid;
+		gap: 15px;
 	}
 
 	:global(.notice.ui-alert) {
@@ -261,6 +288,68 @@
 
 	:global(.form-submit.ui-button) {
 		width: 100%;
+	}
+
+	.import-example {
+		display: grid;
+		gap: 4px;
+		border: 1px dashed var(--qc-border-strong);
+		border-radius: var(--qc-radius-sm);
+		background: var(--qc-surface-green);
+		padding: 12px;
+		color: var(--qc-muted);
+		font-size: 0.84rem;
+	}
+
+	.import-example strong {
+		color: var(--qc-text);
+	}
+
+	.import-example code {
+		font-family: inherit;
+	}
+
+	.import-result {
+		display: grid;
+		gap: 10px;
+		border-top: 1px solid var(--qc-border);
+		padding-top: 12px;
+	}
+
+	.import-result-summary {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.import-result-rows {
+		display: grid;
+		gap: 6px;
+	}
+
+	.import-result-row {
+		display: grid;
+		gap: 2px;
+		border: 1px solid var(--qc-border);
+		border-radius: 12px;
+		background: var(--qc-surface);
+		padding: 9px 10px;
+	}
+
+	.import-result-row[data-status='created'] {
+		border-color: color-mix(in srgb, var(--qc-primary) 22%, var(--qc-border));
+		background: var(--qc-surface-green);
+	}
+
+	.import-result-row span,
+	.import-result-row small {
+		color: var(--qc-muted);
+		font-size: 0.78rem;
+	}
+
+	.import-result-row strong {
+		font-size: 0.92rem;
+		line-height: 1.35;
 	}
 
 	.list-heading {
@@ -318,7 +407,7 @@
 	}
 
 	.student-main span {
-		font-weight: 750;
+		font-weight: 600;
 		line-height: 1.25;
 	}
 
@@ -373,12 +462,11 @@
 			white-space: normal;
 		}
 
-		.primary-action,
-		.secondary-action {
+		:global(.hero-actions .ui-link-button) {
 			width: 100%;
 		}
 
-		.student-form {
+		.roster-tools {
 			position: static;
 		}
 

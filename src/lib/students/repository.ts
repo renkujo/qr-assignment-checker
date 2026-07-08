@@ -37,6 +37,11 @@ const createQrToken = (): string => {
 	return crypto.randomUUID().replaceAll('-', '');
 };
 
+const studentNumberCollator = new Intl.Collator('th', {
+	numeric: true,
+	sensitivity: 'base'
+});
+
 const mapStudentRecord = (student: IStudentRecord): IStudentListItem => {
 	return {
 		id: student.id,
@@ -48,6 +53,22 @@ const mapStudentRecord = (student: IStudentRecord): IStudentListItem => {
 	};
 };
 
+export const compareStudentListItems = (
+	firstStudent: IStudentListItem,
+	secondStudent: IStudentListItem
+): number => {
+	const studentNoCompare = studentNumberCollator.compare(
+		firstStudent.studentNo,
+		secondStudent.studentNo
+	);
+
+	if (studentNoCompare !== 0) {
+		return studentNoCompare;
+	}
+
+	return firstStudent.fullName.localeCompare(secondStudent.fullName, 'th');
+};
+
 export const listStudents = async ({
 	pb,
 	classId
@@ -57,7 +78,7 @@ export const listStudents = async ({
 		sort: 'student_no'
 	});
 
-	return students.map(mapStudentRecord);
+	return students.map(mapStudentRecord).sort(compareStudentListItems);
 };
 
 export const createStudent = async ({
