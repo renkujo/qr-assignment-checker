@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Alert, Badge, Button, Input, Label, LinkButton } from '$lib/components/ui';
+	import { Alert, Badge, Button, DatePicker, Input, Label, LinkButton } from '$lib/components/ui';
 
 	let { data, form } = $props();
 
@@ -68,7 +68,7 @@
 
 				<Label>
 					<span>วันกำหนดส่ง</span>
-					<Input name="dueDate" type="date" value={form?.dueDate || ''} />
+					<DatePicker name="dueDate" value={form?.dueDate || ''} placeholder="เลือกวันกำหนดส่ง" />
 				</Label>
 
 				<Button type="submit" class="form-submit">สร้างงาน</Button>

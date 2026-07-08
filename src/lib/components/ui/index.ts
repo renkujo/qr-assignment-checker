@@ -6,3 +6,4 @@ export { default as Input } from './input.svelte';
 export { default as Label } from './label.svelte';
 export { default as Textarea } from './textarea.svelte';
 export { default as LinkButton } from './link-button.svelte';
+export { default as DatePicker } from './date-picker.svelte';
