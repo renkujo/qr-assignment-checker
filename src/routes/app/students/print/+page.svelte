@@ -3,6 +3,17 @@
 	import { Alert, Button, Card, LinkButton } from '$lib/components/ui';
 
 	let { data } = $props();
+
+	const cardsPerPrintPage = 40;
+
+	const chunkCards = (cards: typeof data.cards): (typeof data.cards)[] => {
+		return Array.from({ length: Math.ceil(cards.length / cardsPerPrintPage) }, (_, pageIndex) => {
+			const startIndex = pageIndex * cardsPerPrintPage;
+			return cards.slice(startIndex, startIndex + cardsPerPrintPage);
+		});
+	};
+
+	const printPages = $derived(chunkCards(data.cards));
 </script>
 
 <svelte:head>
@@ -34,20 +45,26 @@
 			<span>กลับไปเพิ่มนักเรียนก่อน แล้วค่อยพิมพ์การ์ด</span>
 		</Alert>
 	{:else}
-		<section class="card-grid" aria-label="QR cards">
-			{#each data.cards as student (student.id)}
-				<article class="qr-card">
-					<div class="card-heading">
-						<span>เลขที่ {student.studentNo}</span>
-						<strong>{student.fullName}</strong>
+		<div class="print-pages" aria-label="QR cards">
+			{#each printPages as pageCards, pageIndex (pageIndex)}
+				<section class="print-page" aria-label={`QR cards หน้า ${pageIndex + 1}`}>
+					<div class="card-grid">
+						{#each pageCards as student (student.id)}
+							<article class="qr-card">
+								<div class="card-heading">
+									<span>เลขที่ {student.studentNo}</span>
+									<strong>{student.fullName}</strong>
+								</div>
+
+								<img src={student.qrImageDataUrl} alt={`QR ของ ${student.fullName}`} />
+
+								<code>{student.qrPayload}</code>
+							</article>
+						{/each}
 					</div>
-
-					<img src={student.qrImageDataUrl} alt={`QR ของ ${student.fullName}`} />
-
-					<code>{student.qrPayload}</code>
-				</article>
+				</section>
 			{/each}
-		</section>
+		</div>
 	{/if}
 </main>
 
@@ -88,12 +105,23 @@
 		margin: 12px 0 0;
 		color: var(--qc-muted);
 	}
+	.print-pages,
+	.print-page,
+	.card-grid {
+		width: 100%;
+	}
+
+	.print-pages {
+		display: grid;
+		gap: 20px;
+		max-width: 1120px;
+		margin: 0 auto;
+	}
+
 	.card-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 		gap: 14px;
-		max-width: 1120px;
-		margin: 0 auto;
 	}
 
 	.qr-card {
@@ -142,6 +170,11 @@
 	}
 
 	@media print {
+		@page {
+			size: A4 portrait;
+			margin: 5mm;
+		}
+
 		:global(body) {
 			background: var(--qc-surface);
 		}
@@ -155,17 +188,63 @@
 			display: none;
 		}
 
+		.print-pages {
+			display: block;
+			max-width: none;
+			margin: 0;
+		}
+
+		.print-page {
+			break-after: page;
+			page-break-after: always;
+		}
+
+		.print-page:last-child {
+			break-after: auto;
+			page-break-after: auto;
+		}
+
 		.card-grid {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 10mm;
+			grid-template-columns: repeat(5, 1fr);
+			grid-auto-rows: 34.5mm;
+			gap: 1.4mm;
 			max-width: none;
 		}
 
 		.qr-card {
+			align-content: start;
+			gap: 0.8mm;
+			min-height: 0;
 			border-color: var(--qc-text);
-			border-radius: 8px;
+			border-radius: 2mm;
 			box-shadow: none;
-			padding: 8mm;
+			padding: 1.5mm;
+		}
+
+		.card-heading span {
+			font-size: 7pt;
+			line-height: 1.1;
+		}
+
+		.card-heading strong {
+			display: -webkit-box;
+			min-height: 18pt;
+			margin-top: 0.5mm;
+			overflow: hidden;
+			font-size: 8pt;
+			line-clamp: 2;
+			line-height: 1.15;
+			-webkit-box-orient: vertical;
+			-webkit-line-clamp: 2;
+		}
+
+		img {
+			width: 19mm;
+			margin-top: 0.6mm;
+		}
+
+		code {
+			display: none;
 		}
 	}
 </style>
