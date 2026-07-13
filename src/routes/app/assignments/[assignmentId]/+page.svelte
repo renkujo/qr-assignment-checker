@@ -1,12 +1,29 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { Alert, Badge, Button, Card, LinkButton } from '$lib/components/ui';
+	import { Alert, AlertDialog, Badge, Button, Card, LinkButton } from '$lib/components/ui';
+	import type { IAssignmentSummaryRow, ManualSubmissionTargetStatus } from '$lib/submissions';
+	import type { SubmitFunction } from '@sveltejs/kit';
+
+	interface IStudentStatusChange {
+		studentId: string;
+		studentNo: string;
+		fullName: string;
+		currentStatus: IAssignmentSummaryRow['status'];
+		currentUpdatedAt: string;
+		targetStatus: ManualSubmissionTargetStatus;
+	}
 
 	let { data, form } = $props();
 
 	let liveStatus = $state<'connecting' | 'connected' | 'refreshing' | 'offline'>('connecting');
+	let statusDialogOpen = $state(false);
+	let statusPending = $state(false);
+	let statusErrorMessage = $state('');
+	let selectedStatusChange = $state<IStudentStatusChange | null>(null);
+	let statusFormElement = $state<HTMLFormElement>();
 
 	const eventsEndpoint = $derived(
 		resolve('/app/assignments/[assignmentId]/events', { assignmentId: data.assignment.id })
@@ -14,11 +31,77 @@
 	const assignmentStatusVariant = $derived(
 		data.assignment.status === 'closed' ? 'danger' : 'success'
 	);
+	const statusDialogTitle = $derived(
+		selectedStatusChange?.targetStatus === 'submitted'
+			? 'ยืนยันว่ารับงานแล้ว?'
+			: 'เปลี่ยนกลับเป็นยังไม่ได้ส่ง?'
+	);
+	const statusDialogDescription = $derived(
+		selectedStatusChange?.targetStatus === 'submitted'
+			? 'สถานะของนักเรียนจะเปลี่ยนเป็น “ส่งแล้ว” และบันทึกว่าครูเป็นผู้ปรับสถานะ'
+			: data.assignment.status === 'closed'
+				? 'รายการนี้จะถูกยกเลิกจากสรุปผู้ส่งงาน หลังครูเปิดรับใหม่ นักเรียนจึงจะสแกน QR เพื่อส่งใหม่ได้'
+				: 'รายการนี้จะถูกยกเลิกจากสรุปผู้ส่งงาน แต่นักเรียนยังสามารถสแกน QR เพื่อส่งใหม่ได้'
+	);
 
 	const refreshSummary = async () => {
 		liveStatus = 'refreshing';
 		await invalidateAll();
 		liveStatus = 'connected';
+	};
+
+	const formatStatusTime = (value: string): string => {
+		if (!value) return '';
+
+		return new Intl.DateTimeFormat('th-TH', {
+			dateStyle: 'short',
+			timeStyle: 'short'
+		}).format(new Date(value));
+	};
+
+	const openStatusDialog = (
+		row: IAssignmentSummaryRow,
+		targetStatus: ManualSubmissionTargetStatus
+	): void => {
+		if (row.status === targetStatus || statusPending) return;
+
+		selectedStatusChange = {
+			studentId: row.studentId,
+			studentNo: row.studentNo,
+			fullName: row.fullName,
+			currentStatus: row.status,
+			currentUpdatedAt: row.statusUpdatedAt,
+			targetStatus
+		};
+		statusErrorMessage = '';
+		statusDialogOpen = true;
+	};
+
+	const confirmStatusChange = (): void => {
+		if (!selectedStatusChange || statusPending) return;
+
+		statusFormElement?.requestSubmit();
+	};
+
+	const enhanceStatusForm: SubmitFunction = () => {
+		statusPending = true;
+
+		return async ({ result, update }) => {
+			try {
+				await update({ reset: false });
+
+				if (result.type === 'success') {
+					statusDialogOpen = false;
+					selectedStatusChange = null;
+					statusErrorMessage = '';
+				} else if (result.type === 'failure') {
+					const resultData = result.data as { message?: string } | undefined;
+					statusErrorMessage = resultData?.message || 'ปรับสถานะการส่งงานไม่สำเร็จ';
+				}
+			} finally {
+				statusPending = false;
+			}
+		};
 	};
 
 	onMount(() => {
@@ -70,8 +153,15 @@
 						{data.assignment.status === 'closed' ? 'ปิดรับแล้ว' : 'เปิดรับอยู่'}
 					</Badge>
 				</div>
-				{#if form?.message}
-					<Alert variant="danger" class="form-error">{form.message}</Alert>
+				{#if form?.message && form?.formName !== 'studentSubmissionStatus'}
+					<Alert
+						variant={form?.formName === 'studentSubmissionStatus' && form?.statusResult
+							? 'success'
+							: 'danger'}
+						class="form-error"
+					>
+						{form.message}
+					</Alert>
 				{/if}
 			</div>
 
@@ -159,24 +249,100 @@
 		{:else}
 			<div class="status-rows">
 				{#each data.summary.rows as row (row.studentId)}
-					<article class:row-submitted={row.status === 'submitted'} class="status-row">
+					<article
+						class:row-submitted={row.status === 'submitted'}
+						class:is-pending={statusPending && selectedStatusChange?.studentId === row.studentId}
+						class="status-row"
+						aria-busy={statusPending && selectedStatusChange?.studentId === row.studentId}
+					>
 						<div class="student-main">
 							<strong>{row.studentNo}</strong>
 							<div>
 								<span>{row.fullName}</span>
-								{#if row.submittedAt}
-									<time>{row.submittedAt}</time>
+								{#if row.statusUpdatedAt}
+									<time>
+										{row.statusSource === 'camera' ? 'สแกน QR' : 'ครูปรับสถานะ'} ·
+										{formatStatusTime(row.statusUpdatedAt)}
+									</time>
 								{/if}
 							</div>
 						</div>
-						<Badge variant={row.status === 'submitted' ? 'success' : 'warning'}>
-							{row.status === 'submitted' ? 'ส่งแล้ว' : 'ยังไม่ส่ง'}
-						</Badge>
+						<div class="status-control">
+							<div
+								class="status-segmented"
+								role="group"
+								aria-label={`ปรับสถานะการส่งงานของ ${row.fullName}`}
+							>
+								<button
+									type="button"
+									class:is-active={row.status === 'missing'}
+									aria-pressed={row.status === 'missing'}
+									disabled={row.status === 'missing' || statusPending}
+									onclick={() => openStatusDialog(row, 'missing')}
+								>
+									ยังไม่ได้ส่ง
+								</button>
+								<button
+									type="button"
+									class:is-active={row.status === 'submitted'}
+									aria-pressed={row.status === 'submitted'}
+									disabled={row.status === 'submitted' || statusPending}
+									onclick={() => openStatusDialog(row, 'submitted')}
+								>
+									ส่งแล้ว
+								</button>
+							</div>
+							{#if statusPending && selectedStatusChange?.studentId === row.studentId}
+								<span class="status-pending" role="status">กำลังบันทึกสถานะ…</span>
+							{/if}
+						</div>
 					</article>
 				{/each}
 			</div>
 		{/if}
 	</Card>
+
+	<form
+		bind:this={statusFormElement}
+		method="POST"
+		action="?/setStudentSubmissionStatus"
+		use:enhance={enhanceStatusForm}
+		class="manual-status-form"
+	>
+		<input type="hidden" name="studentId" value={selectedStatusChange?.studentId || ''} />
+		<input type="hidden" name="expectedStatus" value={selectedStatusChange?.currentStatus || ''} />
+		<input
+			type="hidden"
+			name="expectedUpdatedAt"
+			value={selectedStatusChange?.currentUpdatedAt || ''}
+		/>
+		<input type="hidden" name="targetStatus" value={selectedStatusChange?.targetStatus || ''} />
+	</form>
+
+	<AlertDialog
+		bind:open={statusDialogOpen}
+		title={statusDialogTitle}
+		description={statusDialogDescription}
+		cancelLabel="ยกเลิก"
+		confirmLabel={selectedStatusChange?.targetStatus === 'submitted'
+			? 'ยืนยันส่งแล้ว'
+			: 'เปลี่ยนเป็นยังไม่ได้ส่ง'}
+		confirmVariant={selectedStatusChange?.targetStatus === 'submitted' ? 'primary' : 'danger'}
+		pending={statusPending}
+		pendingLabel="กำลังบันทึก…"
+		closeOnConfirm={false}
+		onconfirm={confirmStatusChange}
+	>
+		{#if selectedStatusChange}
+			<div class="status-dialog-student">
+				<strong>เลขที่ {selectedStatusChange.studentNo} · {selectedStatusChange.fullName}</strong>
+				<span>งาน: {data.assignment.title}</span>
+			</div>
+		{/if}
+		{#if statusErrorMessage}
+			<Alert variant="danger" class="status-dialog-error">{statusErrorMessage}</Alert>
+		{/if}
+	</AlertDialog>
 </main>
 
 <style>
@@ -391,6 +557,91 @@
 		background: var(--qc-surface-green);
 	}
 
+	.status-row.is-pending {
+		border-color: var(--qc-primary);
+	}
+
+	.status-control {
+		display: grid;
+		justify-items: end;
+		gap: 5px;
+	}
+
+	.status-pending {
+		color: var(--qc-primary);
+		font-size: 0.78rem;
+	}
+
+	.status-segmented {
+		display: inline-grid;
+		grid-template-columns: repeat(2, minmax(94px, 1fr));
+		gap: 3px;
+		border: 1px solid var(--qc-border-strong);
+		border-radius: var(--qc-radius-md);
+		background: var(--qc-bg-soft);
+		padding: 3px;
+	}
+
+	.status-segmented button {
+		min-height: 36px;
+		border: 1px solid transparent;
+		border-radius: var(--qc-radius-sm);
+		background: transparent;
+		color: var(--qc-muted);
+		font: inherit;
+		font-size: 0.85rem;
+		font-weight: 500;
+		cursor: pointer;
+	}
+
+	.status-segmented button:hover:not(:disabled) {
+		border-color: var(--qc-border-strong);
+		background: var(--qc-surface);
+		color: var(--qc-text);
+	}
+
+	.status-segmented button.is-active {
+		border-color: color-mix(in srgb, var(--qc-primary) 24%, var(--qc-border));
+		background: var(--qc-surface);
+		color: var(--qc-text);
+	}
+
+	.status-segmented button:last-child.is-active {
+		border-color: color-mix(in srgb, var(--qc-success) 28%, var(--qc-border));
+		color: var(--qc-success);
+	}
+
+	.status-segmented button:disabled {
+		cursor: default;
+	}
+
+	.manual-status-form {
+		display: none;
+	}
+
+	.status-dialog-student {
+		display: grid;
+		gap: 4px;
+		margin-top: 14px;
+		border: 1px solid var(--qc-border);
+		border-radius: var(--qc-radius-md);
+		background: var(--qc-bg);
+		padding: 12px;
+	}
+
+	.status-dialog-student strong,
+	.status-dialog-student span {
+		display: block;
+	}
+
+	.status-dialog-student strong {
+		color: var(--qc-text);
+	}
+
+	:global(.status-dialog-error.ui-alert) {
+		margin-top: 10px;
+	}
+
 	.student-main {
 		display: flex;
 		align-items: center;
@@ -477,6 +728,15 @@
 
 		.student-main {
 			align-items: flex-start;
+		}
+
+		.status-control,
+		.status-segmented {
+			width: 100%;
+		}
+
+		.status-control {
+			justify-items: stretch;
 		}
 	}
 </style>

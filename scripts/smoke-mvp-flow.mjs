@@ -139,6 +139,14 @@ const createFixture = async (pb) => {
 		qr_token: missingToken,
 		active: true
 	});
+	const formulaStudent = await pb.collection('students').create({
+		class: classRecord.id,
+		class_code: classRecord.class_code,
+		student_no: '99',
+		full_name: '=HYPERLINK("https://example.test","x")',
+		qr_token: crypto.randomUUID().replaceAll('-', ''),
+		active: true
+	});
 	const assignment = await pb.collection('assignments').create({
 		class: classRecord.id,
 		class_code: classRecord.class_code,
@@ -154,6 +162,7 @@ const createFixture = async (pb) => {
 		assignment,
 		submittedStudent,
 		missingStudent,
+		formulaStudent,
 		submittedToken,
 		missingToken
 	};
@@ -201,6 +210,32 @@ const setAssignmentStatus = async ({ assignmentId, cookie, status }) => {
 	});
 };
 
+const setStudentSubmissionStatus = async ({
+	assignmentId,
+	studentId,
+	cookie,
+	expectedStatus,
+	expectedUpdatedAt,
+	targetStatus
+}) => {
+	const formData = new URLSearchParams();
+	formData.set('studentId', studentId);
+	formData.set('expectedStatus', expectedStatus);
+	formData.set('expectedUpdatedAt', expectedUpdatedAt);
+	formData.set('targetStatus', targetStatus);
+
+	return fetch(`${appUrl}/app/assignments/${assignmentId}?/setStudentSubmissionStatus`, {
+		method: 'POST',
+		headers: {
+			accept: 'text/html',
+			'content-type': 'application/x-www-form-urlencoded',
+			cookie
+		},
+		body: formData,
+		redirect: 'manual'
+	});
+};
+
 const assertStudentImport = async ({ pb, classRecord, cookie }) => {
 	const formData = new URLSearchParams();
 	formData.set(
@@ -228,7 +263,7 @@ const assertStudentImport = async ({ pb, classRecord, cookie }) => {
 	const studentNumbers = students.map((student) => String(student.student_no));
 	const importedStudent = students.find((student) => student.student_no === '3');
 
-	assert(students.length === 4, `Expected 4 students after import, got ${students.length}`);
+	assert(students.length === 5, `Expected 5 students after import, got ${students.length}`);
 	assert(studentNumbers.includes('3'), 'Expected imported student number 3');
 	assert(studentNumbers.includes('4'), 'Expected imported student number 4');
 	assert(importedStudent?.qr_token, 'Expected imported student to have qr_token');
@@ -259,7 +294,7 @@ const assertDirectCreateBlocked = async ({
 	throw new Error('Direct submissions.create unexpectedly succeeded');
 };
 
-const assertCsvExport = async ({ assignmentId, cookie }) => {
+const assertCsvExport = async ({ assignmentId, cookie, phase = 'initial' }) => {
 	const response = await fetch(`${appUrl}/app/assignments/${assignmentId}/export`, {
 		headers: { cookie },
 		redirect: 'manual'
@@ -273,12 +308,35 @@ const assertCsvExport = async ({ assignmentId, cookie }) => {
 		'Expected export content-type text/csv'
 	);
 	assert(bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf, 'Expected CSV BOM');
-	assert(csv.includes('"เลขที่","ชื่อ-นามสกุล","สถานะ","เวลาส่ง"'), 'Missing CSV header');
-	assert(csv.includes('"1","MVP ส่งแล้ว","ส่งแล้ว"'), 'Missing submitted row');
+	assert(
+		csv.includes('"เลขที่","ชื่อ-นามสกุล","สถานะ","เวลาส่ง","วิธีบันทึก","อัปเดตสถานะล่าสุด"'),
+		'Missing CSV header'
+	);
+	assert(
+		csv.includes('"\'=HYPERLINK(""https://example.test"",""x"")"'),
+		'Missing spreadsheet-safe formula prefix'
+	);
+
+	if (phase === 'manual-correction') {
+		assert(
+			csv.includes('"1","MVP ส่งแล้ว","ยังไม่ส่ง","","ครูปรับสถานะ"'),
+			`Missing manually revoked row. CSV: ${csv}`
+		);
+		assert(
+			csv.includes('"2","MVP ยังไม่ส่ง","ส่งแล้ว"') && csv.includes('"ครูปรับสถานะ"'),
+			'Missing manually submitted row'
+		);
+		return;
+	}
+
+	assert(
+		csv.includes('"1","MVP ส่งแล้ว","ส่งแล้ว"') && csv.includes('"สแกน QR"'),
+		'Missing scanned submitted row'
+	);
 	assert(csv.includes('"2","MVP ยังไม่ส่ง","ยังไม่ส่ง",""'), 'Missing missing row');
 };
 
-const assertRealtimeChange = async ({ assignmentId, cookie, trigger }) => {
+const assertRealtimeChange = async ({ assignmentId, cookie, trigger, label }) => {
 	const controller = new AbortController();
 	const response = await fetch(`${appUrl}/app/assignments/${assignmentId}/events`, {
 		headers: { cookie },
@@ -298,7 +356,17 @@ const assertRealtimeChange = async ({ assignmentId, cookie, trigger }) => {
 
 	try {
 		while (Date.now() < timeoutAt) {
-			const { done, value } = await reader.read();
+			const remainingTime = Math.max(0, timeoutAt - Date.now());
+			const readResult = await Promise.race([
+				reader.read(),
+				wait(remainingTime).then(() => ({ done: true, value: undefined, timedOut: true }))
+			]);
+
+			if ('timedOut' in readResult) {
+				break;
+			}
+
+			const { done, value } = readResult;
 
 			if (done) {
 				break;
@@ -325,8 +393,15 @@ const assertRealtimeChange = async ({ assignmentId, cookie, trigger }) => {
 		}
 	}
 
-	assert(sawReady, 'Expected realtime ready event');
-	assert(sawChange, 'Expected realtime change event after scan');
+	assert(sawReady, `Expected realtime ready event for ${label}`);
+	assert(
+		sawChange,
+		`Expected realtime change event for ${label}. Trigger result: ${JSON.stringify(
+			triggerResult instanceof Response
+				? { status: triggerResult.status, statusText: triggerResult.statusText }
+				: triggerResult
+		)}`
+	);
 
 	return triggerResult;
 };
@@ -346,6 +421,7 @@ const main = async () => {
 	const firstScan = await assertRealtimeChange({
 		assignmentId: fixture.assignment.id,
 		cookie,
+		label: 'initial scan',
 		trigger: () => postScan({ assignmentId: fixture.assignment.id, cookie, qrPayload })
 	});
 	assert(firstScan?.httpStatus === 200, `Expected first scan 200, got ${firstScan?.httpStatus}`);
@@ -375,6 +451,58 @@ const main = async () => {
 
 	const closedAssignment = await pb.collection('assignments').getOne(fixture.assignment.id);
 	assert(closedAssignment.status === 'closed', 'Expected assignment status closed');
+	const submittedBeforeRevoke = await pb.collection('submissions').getFirstListItem(
+		pb.filter('submission_key = {:submissionKey}', {
+			submissionKey: `${fixture.assignment.id}:${fixture.submittedStudent.id}`
+		})
+	);
+
+	const manualRevoke = await assertRealtimeChange({
+		assignmentId: fixture.assignment.id,
+		cookie,
+		label: 'manual revoke',
+		trigger: () =>
+			setStudentSubmissionStatus({
+				assignmentId: fixture.assignment.id,
+				studentId: fixture.submittedStudent.id,
+				cookie,
+				expectedStatus: 'submitted',
+				expectedUpdatedAt: submittedBeforeRevoke.status_updated_at,
+				targetStatus: 'missing'
+			})
+	});
+	assert(manualRevoke?.status === 200, `Expected manual revoke 200, got ${manualRevoke?.status}`);
+
+	const revokedSubmission = await pb.collection('submissions').getFirstListItem(
+		pb.filter('submission_key = {:submissionKey}', {
+			submissionKey: `${fixture.assignment.id}:${fixture.submittedStudent.id}`
+		})
+	);
+	assert(revokedSubmission.status === 'revoked', 'Expected submitted student to be revoked');
+
+	const manualSubmit = await setStudentSubmissionStatus({
+		assignmentId: fixture.assignment.id,
+		studentId: fixture.missingStudent.id,
+		cookie,
+		expectedStatus: 'missing',
+		expectedUpdatedAt: '',
+		targetStatus: 'submitted'
+	});
+	assert(manualSubmit.status === 200, `Expected manual submit 200, got ${manualSubmit.status}`);
+
+	const manuallySubmittedRecord = await pb.collection('submissions').getFirstListItem(
+		pb.filter('submission_key = {:submissionKey}', {
+			submissionKey: `${fixture.assignment.id}:${fixture.missingStudent.id}`
+		})
+	);
+	assert(manuallySubmittedRecord.status === 'submitted', 'Expected missing student submitted');
+	assert(manuallySubmittedRecord.scan_source === 'manual', 'Expected manual submission source');
+
+	await assertCsvExport({
+		assignmentId: fixture.assignment.id,
+		cookie,
+		phase: 'manual-correction'
+	});
 
 	const closedScan = await postScan({ assignmentId: fixture.assignment.id, cookie, qrPayload });
 	assert(closedScan.httpStatus === 400, `Expected closed scan 400, got ${closedScan.httpStatus}`);
@@ -399,17 +527,32 @@ const main = async () => {
 		`Expected reopened scan 200, got ${reopenedScan.httpStatus}`
 	);
 	assert(
-		reopenedScan.payload.status === 'duplicate',
-		`Expected reopened scan duplicate, got ${reopenedScan.payload.status}`
+		reopenedScan.payload.status === 'submitted',
+		`Expected reopened scan to reactivate submission, got ${reopenedScan.payload.status}`
+	);
+
+	const duplicateAfterReactivation = await postScan({
+		assignmentId: fixture.assignment.id,
+		cookie,
+		qrPayload
+	});
+	assert(
+		duplicateAfterReactivation.payload.status === 'duplicate',
+		`Expected duplicate after reactivation, got ${duplicateAfterReactivation.payload.status}`
 	);
 
 	const submissions = await pb.collection('submissions').getList(1, 10, {
 		filter: pb.filter('assignment = {:assignmentId}', { assignmentId: fixture.assignment.id })
 	});
 	assert(
-		submissions.totalItems === 1,
-		`Expected exactly 1 submission, got ${submissions.totalItems}`
+		submissions.totalItems === 2,
+		`Expected exactly 2 submission records, got ${submissions.totalItems}`
 	);
+
+	const statusEvents = await pb.collection('submission_status_events').getList(1, 20, {
+		filter: pb.filter('assignment = {:assignmentId}', { assignmentId: fixture.assignment.id })
+	});
+	assert(statusEvents.totalItems === 4, `Expected 4 audit events, got ${statusEvents.totalItems}`);
 
 	console.log(
 		JSON.stringify(
@@ -428,7 +571,10 @@ const main = async () => {
 					'realtime-summary-event',
 					'csv-export',
 					'close-blocks-scan',
-					'reopen-allows-scan'
+					'manual-revoke-while-closed',
+					'manual-submit-while-closed',
+					'reopen-reactivates-revoked-scan',
+					'submission-audit-events'
 				]
 			},
 			null,

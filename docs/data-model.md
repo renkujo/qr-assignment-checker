@@ -90,6 +90,7 @@ Fields:
 - `submitted_at` date
 - `scan_source` select: `camera`, `manual`
 - `submission_key` text unique
+- `status` select: `submitted`, `revoked`
 
 `submission_key` format:
 
@@ -112,10 +113,30 @@ Indexes:
 2. หา student จาก `qr_token`
 3. ตรวจว่า student อยู่ class เดียวกับ assignment
 4. สร้าง `submission_key = assignmentId:studentId`
-5. create submission
-6. ถ้า unique conflict ให้ตอบกลับเป็น duplicate/already submitted
+5. create submission หรือ reactivate record เดิมที่เป็น `revoked`
+6. ถ้า record เดิมยังเป็น `submitted` ให้ตอบกลับเป็น duplicate/already submitted
 
 Frontend debounce ช่วย UX แต่ DB unique key คือ guard หลัก
+
+เมื่อครูเปลี่ยนเป็น `ยังไม่ได้ส่ง` ห้ามลบ submission record ให้เปลี่ยน `status` เป็น `revoked`
+เพื่อเก็บ `submission_key` เดิมไว้ หากนักเรียนสแกน QR ใหม่ให้ reactivate record เดิมกลับเป็น
+`submitted`
+
+### submission_status_events
+
+audit log แบบ append-only สำหรับทุก status transition
+
+- `submission` relation -> submissions
+- `assignment` relation -> assignments
+- `student` relation -> students
+- `submission_key` text
+- `from_status` select optional: `submitted`, `revoked`
+- `to_status` select: `submitted`, `revoked`
+- `source` select: `camera`, `manual`
+- `teacher` relation -> users
+- `changed_at` date
+
+ครูสามารถปรับสถานะได้แม้งานปิดรับ เพราะเป็น teacher correction และไม่เปิด scanner ให้นักเรียน
 
 ## PocketBase access rule direction
 

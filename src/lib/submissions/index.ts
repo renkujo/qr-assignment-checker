@@ -11,5 +11,12 @@ export type {
 	IAssignmentSummary,
 	IAssignmentSummaryRow,
 	IGetAssignmentSummaryInput,
-	ISubmissionRecord
+	ISubmissionRecord,
+	ISubmissionStatusEventRecord
 } from './summary';
+export { updateSubmissionStatus } from './update-submission-status';
+export type {
+	IUpdateSubmissionStatusInput,
+	IUpdateSubmissionStatusResult,
+	ManualSubmissionTargetStatus
+} from './update-submission-status';

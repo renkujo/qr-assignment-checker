@@ -5,11 +5,15 @@ import { getAssignmentSummary } from '$lib/submissions';
 import type { IAssignmentSummaryRow } from '$lib/submissions';
 import { listStudents } from '$lib/students';
 
-const csvHeader = ['เลขที่', 'ชื่อ-นามสกุล', 'สถานะ', 'เวลาส่ง'];
+const csvHeader = ['เลขที่', 'ชื่อ-นามสกุล', 'สถานะ', 'เวลาส่ง', 'วิธีบันทึก', 'อัปเดตสถานะล่าสุด'];
 
 const escapeCsvCell = (value: string): string => {
 	const normalizedValue = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-	const escapedValue = normalizedValue.replaceAll('"', '""');
+	const firstVisibleCharacter = normalizedValue.trimStart().charAt(0);
+	const spreadsheetSafeValue = ['=', '+', '-', '@'].includes(firstVisibleCharacter)
+		? `'${normalizedValue}`
+		: normalizedValue;
+	const escapedValue = spreadsheetSafeValue.replaceAll('"', '""');
 
 	return `"${escapedValue}"`;
 };
@@ -18,8 +22,22 @@ const getThaiStatus = (status: IAssignmentSummaryRow['status']): string => {
 	return status === 'submitted' ? 'ส่งแล้ว' : 'ยังไม่ส่ง';
 };
 
+const getThaiStatusSource = (source: IAssignmentSummaryRow['statusSource']): string => {
+	if (source === 'camera') return 'สแกน QR';
+	if (source === 'manual') return 'ครูปรับสถานะ';
+
+	return '';
+};
+
 const createCsvRow = (row: IAssignmentSummaryRow): string => {
-	return [row.studentNo, row.fullName, getThaiStatus(row.status), row.submittedAt]
+	return [
+		row.studentNo,
+		row.fullName,
+		getThaiStatus(row.status),
+		row.submittedAt,
+		getThaiStatusSource(row.statusSource),
+		row.statusUpdatedAt
+	]
 		.map(escapeCsvCell)
 		.join(',');
 };

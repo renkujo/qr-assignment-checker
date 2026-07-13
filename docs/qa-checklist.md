@@ -55,6 +55,11 @@ Release MVP only when:
 - login works
 - roster works
 - QR cards print/render
+- Teacher can change a student from missing to submitted after confirmation.
+- Teacher can change a student from submitted to missing after danger confirmation.
+- Teacher status correction works while the assignment is closed without reopening scanner access.
+- Revoked student can scan again after the assignment is reopened and the same submission record is reactivated.
+- Summary/realtime/CSV reflect manual status corrections and audit source.
 - assignment create works
 - scanner works on real mobile browser over HTTPS
 - duplicate prevention works at DB level

@@ -117,3 +117,8 @@ Then open the Admin UI at `http://127.0.0.1:8090/_/`.
 - `/app/assignments/[assignmentId]` — live submitted/missing summary, close/reopen assignment, CSV export link
 - `/app/assignments/[assignmentId]/export` — CSV export for Excel
 - `/app/assignments/[assignmentId]/scan` — mobile QR scanner page
+
+Teachers can correct each student's status from the assignment summary. Every change requires a
+confirmation dialog, works even after the assignment is closed, preserves the stable submission key,
+and records an append-only audit event. A student changed back to missing can scan the same QR again
+after the assignment is reopened.

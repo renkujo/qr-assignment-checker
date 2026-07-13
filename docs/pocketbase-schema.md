@@ -121,6 +121,7 @@ Stores the actual submitted status. This is the correctness boundary for duplica
 | `submitted_at`   | date                      | yes      | Server/client submission timestamp  |
 | `scan_source`    | select                    | yes      | `camera`, `manual`                  |
 | `submission_key` | text                      | yes      | Unique `<assignmentId>:<studentId>` |
+| `status`         | select                    | yes      | `submitted`, `revoked`              |
 
 Indexes / constraints:
 
@@ -129,15 +130,40 @@ Indexes / constraints:
 - index `student`
 - index `class_code`
 - index `submitted_by`
+- index `status`
 
 Rule intent:
 
 - Direct REST create for `submissions` is disabled.
-- Teachers create submissions through `POST /api/scan-submissions` only.
+- Teachers create/update submission state through the server-owned scan/manual endpoints only.
 - The custom endpoint validates that the assignment/class belongs to the authenticated teacher.
 - Teacher can list/view submissions only in own classes.
-- Update/delete should be disabled at first or admin-only.
+- Direct REST update/delete remains disabled; `POST /api/manual-submission-status` owns corrections.
 - Duplicate submission must resolve to `ส่งแล้ว`; the unique `submission_key` remains the final race-condition guard.
+
+`submissions` is the current-state record. A revoked record remains in the collection so the same
+`submission_key` can be reactivated by a later QR scan or teacher correction.
+
+### `submission_status_events`
+
+Append-only audit events for every real status transition.
+
+| Field            | Type                      | Required | Notes                         |
+| ---------------- | ------------------------- | -------- | ----------------------------- |
+| `submission`     | relation -> `submissions` | yes      | Current-state record          |
+| `assignment`     | relation -> `assignments` | yes      | Assignment snapshot relation  |
+| `student`        | relation -> `students`    | yes      | Student snapshot relation     |
+| `submission_key` | text                      | yes      | Stable assignment/student key |
+| `from_status`    | select                    | no       | Empty for first submission    |
+| `to_status`      | select                    | yes      | `submitted`, `revoked`        |
+| `source`         | select                    | yes      | `camera`, `manual`            |
+| `teacher`        | relation -> `users`       | yes      | Teacher who changed status    |
+| `changed_at`     | date                      | yes      | Server transition timestamp   |
+
+Rule intent:
+
+- Teacher can list/view events only for their own audit trail.
+- Direct create/update/delete is disabled; server hooks own all writes.
 
 ## Scan flow contract
 
@@ -149,7 +175,23 @@ When scanner reads QR:
 4. PocketBase confirms assignment owner, class membership, active student state, and assignment status.
 5. PocketBase creates `submission_key = assignmentId:studentId`.
 6. PocketBase creates `submissions` server-side.
-7. If a matching submission already exists, return duplicate/already-submitted state.
+7. If a matching submission is already `submitted`, return duplicate/already-submitted state.
+8. If a matching submission is `revoked`, reactivate the same record and preserve `submission_key`.
+9. Append a `submission_status_events` record for every real transition.
+
+## Teacher status correction contract
+
+Authenticated teachers use `POST /api/manual-submission-status` with:
+
+```txt
+assignmentId + studentId + status(submitted|missing)
+```
+
+The endpoint validates assignment ownership, class membership, and active student state. It can run
+while an assignment is closed because it is a teacher correction, not a student submission. Setting
+`missing` revokes the existing submission without deleting it; setting `submitted` creates or
+reactivates the stable record. Requests that already match the current state are no-ops and do not
+append duplicate audit events.
 
 Frontend debounce/scan lock is required for UX, but it is not the correctness guard.
 
@@ -175,7 +217,7 @@ CSV export uses the same authoritative summary rows.
 Columns:
 
 ```txt
-เลขที่,ชื่อ-นามสกุล,สถานะ,เวลาส่ง
+เลขที่,ชื่อ-นามสกุล,สถานะ,เวลาส่ง,วิธีบันทึก,อัปเดตสถานะล่าสุด
 ```
 
 Rules:
@@ -191,3 +233,7 @@ Rules:
 The first code migration under `pocketbase/pb_migrations/` creates the collections and unique/index guards. It reuses PocketBase's default `users` auth collection and adds `school_name`.
 
 The first migration creates the base collections and indexes. A follow-up migration locks direct `submissions` create by setting `submissions.createRule = null`; scan writes now go through `pocketbase/pb_hooks/main.pb.js` at `POST /api/scan-submissions`.
+
+Migration `1783351000_add_submission_status_audit.js` adds current `submitted`/`revoked` state,
+migrates existing records to `submitted`, and creates the append-only `submission_status_events`
+collection. The same hook file owns both scan and manual status endpoints.
