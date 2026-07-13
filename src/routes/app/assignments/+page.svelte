@@ -1,8 +1,20 @@
 <script lang="ts">
+	import Icon from '@iconify/svelte/dist/OfflineIcon.svelte';
+	import rotateCcwIconModule from '@iconify/icons-lucide/rotate-ccw.js';
+	import trashIconModule from '@iconify/icons-lucide/trash-2.js';
 	import { resolve } from '$app/paths';
 	import { Alert, Badge, Button, DatePicker, Input, Label, LinkButton } from '$lib/components/ui';
 
 	let { data, form } = $props();
+
+	type IIconifyIconData = typeof rotateCcwIconModule;
+	const resolveIconData = (
+		iconModule: IIconifyIconData | { default: IIconifyIconData }
+	): IIconifyIconData => ('default' in iconModule ? iconModule.default : iconModule);
+	const rotateCcwIcon = resolveIconData(rotateCcwIconModule);
+	const trashIcon = resolveIconData(trashIconModule);
+	const assignmentsPath = resolve('/app/assignments');
+	const trashPath = `${assignmentsPath}?view=trash`;
 
 	const getStatusLabel = (status: string): string => {
 		if (status === 'closed') return 'ปิดรับแล้ว';
@@ -14,6 +26,15 @@
 		if (status === 'closed') return 'danger';
 		if (status === 'draft') return 'muted';
 		return 'success';
+	};
+
+	const formatDeletedAt = (value: string): string => {
+		if (!value) return '';
+
+		return new Intl.DateTimeFormat('th-TH', {
+			dateStyle: 'medium',
+			timeStyle: 'short'
+		}).format(new Date(value));
 	};
 </script>
 
@@ -37,11 +58,28 @@
 				{/if}
 			</div>
 
-			<LinkButton variant="secondary" href={resolve('/app/students')}
-				>จัดการรายชื่อนักเรียน</LinkButton
-			>
+			<div class="hero-actions">
+				<LinkButton variant="secondary" href={resolve('/app/students')}
+					>จัดการรายชื่อนักเรียน</LinkButton
+				>
+				<LinkButton
+					variant={data.isTrashView ? 'primary' : 'secondary'}
+					href={data.isTrashView ? assignmentsPath : trashPath}
+				>
+					{#if data.isTrashView}
+						กลับรายการงาน ({data.activeAssignmentCount})
+					{:else}
+						<Icon icon={trashIcon} width="17" height="17" aria-hidden="true" />
+						ถังขยะ ({data.deletedAssignmentCount})
+					{/if}
+				</LinkButton>
+			</div>
 		</div>
 	</header>
+
+	{#if data.notice}
+		<Alert variant="success" class="notice">{data.notice}</Alert>
+	{/if}
 
 	{#if data.unavailable}
 		<Alert variant="warning" class="notice">
@@ -49,66 +87,108 @@
 			<span>รัน `pnpm pb:serve` แล้วกลับมา refresh หน้านี้อีกครั้ง</span>
 		</Alert>
 	{:else}
-		<section class="work-layout">
-			<form method="POST" action="?/create" class="assignment-form" aria-labelledby="add-title">
-				<div class="panel-heading">
-					<p class="section-kicker">สร้างงาน</p>
-					<h2 id="add-title">งานใหม่</h2>
-					<span>สร้างงานแล้วเปิดให้สแกนได้ทันที</span>
-				</div>
+		<section class:trash-layout={data.isTrashView} class="work-layout">
+			{#if !data.isTrashView}
+				<form method="POST" action="?/create" class="assignment-form" aria-labelledby="add-title">
+					<div class="panel-heading">
+						<p class="section-kicker">สร้างงาน</p>
+						<h2 id="add-title">งานใหม่</h2>
+						<span>สร้างงานแล้วเปิดให้สแกนได้ทันที</span>
+					</div>
 
-				{#if form?.message}
-					<Alert variant="danger" class="form-error">{form.message}</Alert>
-				{/if}
+					{#if form?.message && form?.formName === 'createAssignment'}
+						<Alert variant="danger" class="form-error">{form.message}</Alert>
+					{/if}
 
-				<Label>
-					<span>ชื่องาน</span>
-					<Input name="title" value={form?.title || ''} placeholder="เช่น ใบงานบทที่ 1" required />
-				</Label>
+					<Label>
+						<span>ชื่องาน</span>
+						<Input
+							name="title"
+							value={form?.title || ''}
+							placeholder="เช่น ใบงานบทที่ 1"
+							required
+						/>
+					</Label>
 
-				<Label>
-					<span>วันกำหนดส่ง</span>
-					<DatePicker name="dueDate" value={form?.dueDate || ''} placeholder="เลือกวันกำหนดส่ง" />
-				</Label>
+					<Label>
+						<span>วันกำหนดส่ง</span>
+						<DatePicker name="dueDate" value={form?.dueDate || ''} placeholder="เลือกวันกำหนดส่ง" />
+					</Label>
 
-				<Button type="submit" class="form-submit">สร้างงาน</Button>
-			</form>
+					<Button type="submit" class="form-submit">สร้างงาน</Button>
+				</form>
+			{/if}
 
 			<section class="assignment-list" aria-labelledby="assignment-list-title">
 				<div class="list-heading">
 					<div>
-						<p class="section-kicker">รายการตรวจงาน</p>
-						<h2 id="assignment-list-title">ทั้งหมด {data.assignments.length} งาน</h2>
+						<p class="section-kicker">{data.isTrashView ? 'ถังขยะ' : 'รายการตรวจงาน'}</p>
+						<h2 id="assignment-list-title">
+							{data.isTrashView ? 'ใบงานที่ลบ' : 'งานที่ต้องตรวจ'}
+							{data.assignments.length} งาน
+						</h2>
 					</div>
-					<span>เลือกงานเพื่อดูสรุป สแกน หรือดาวน์โหลด CSV</span>
+					<span>
+						{data.isTrashView
+							? 'กู้คืนแล้วใบงานจะกลับมาในสถานะปิดรับ'
+							: 'เลือกงานเพื่อดูสรุป สแกน หรือดาวน์โหลด CSV'}
+					</span>
 				</div>
+
+				{#if form?.message && form?.formName === 'restoreAssignment'}
+					<Alert variant="danger" class="form-error">{form.message}</Alert>
+				{/if}
 
 				{#if data.assignments.length === 0}
 					<div class="empty-state">
-						<strong>ยังไม่มีงานที่ต้องตรวจ</strong>
-						<span>สร้างงานแรกก่อน แล้วระบบจะเตรียมหน้าสรุปและปุ่มสแกนให้</span>
+						<strong>{data.isTrashView ? 'ถังขยะยังว่าง' : 'ยังไม่มีงานที่ต้องตรวจ'}</strong>
+						<span>
+							{data.isTrashView
+								? 'ใบงานที่ลบจะมาอยู่ตรงนี้และกู้คืนได้'
+								: 'สร้างงานแรกก่อน แล้วระบบจะเตรียมหน้าสรุปและปุ่มสแกนให้'}
+						</span>
 					</div>
 				{:else}
 					<div class="assignment-rows">
 						{#each data.assignments as assignment (assignment.id)}
-							<a
-								class:row-closed={assignment.status === 'closed'}
-								class="assignment-row"
-								href={resolve('/app/assignments/[assignmentId]', { assignmentId: assignment.id })}
-							>
-								<div class="assignment-main">
-									<strong>{assignment.title}</strong>
-									<span>
-										{assignment.subject}{assignment.dueDate ? ` · ส่ง ${assignment.dueDate}` : ''}
-									</span>
-								</div>
-								<div class="assignment-action">
-									<Badge variant={getStatusVariant(assignment.status)}>
-										{getStatusLabel(assignment.status)}
-									</Badge>
-									<em>{assignment.status === 'closed' ? 'ดูสรุป' : 'ตรวจงาน'}</em>
-								</div>
-							</a>
+							{#if data.isTrashView}
+								<article class="assignment-row row-deleted">
+									<div class="assignment-main">
+										<strong>{assignment.title}</strong>
+										<span>
+											{assignment.subject} · ลบเมื่อ {formatDeletedAt(assignment.deletedAt)}
+										</span>
+									</div>
+									<form method="POST" action="?/restore">
+										<input type="hidden" name="assignmentId" value={assignment.id} />
+										<Button type="submit" variant="secondary" class="restore-button">
+											<Icon icon={rotateCcwIcon} width="17" height="17" aria-hidden="true" />
+											กู้คืน
+										</Button>
+									</form>
+								</article>
+							{:else}
+								<a
+									class:row-closed={assignment.status === 'closed'}
+									class="assignment-row"
+									href={resolve('/app/assignments/[assignmentId]', {
+										assignmentId: assignment.id
+									})}
+								>
+									<div class="assignment-main">
+										<strong>{assignment.title}</strong>
+										<span>
+											{assignment.subject}{assignment.dueDate ? ` · ส่ง ${assignment.dueDate}` : ''}
+										</span>
+									</div>
+									<div class="assignment-action">
+										<Badge variant={getStatusVariant(assignment.status)}>
+											{getStatusLabel(assignment.status)}
+										</Badge>
+										<em>{assignment.status === 'closed' ? 'ดูสรุป' : 'ตรวจงาน'}</em>
+									</div>
+								</a>
+							{/if}
 						{/each}
 					</div>
 				{/if}
@@ -141,6 +221,12 @@
 
 	.assignment-row {
 		text-decoration: none;
+	}
+
+	.hero-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 	}
 
 	.hero-grid {
@@ -195,6 +281,10 @@
 		grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
 		gap: 16px;
 		margin-top: 16px;
+	}
+
+	.work-layout.trash-layout {
+		grid-template-columns: 1fr;
 	}
 
 	.assignment-form,
@@ -260,6 +350,14 @@
 		background: color-mix(in srgb, var(--qc-surface) 82%, var(--qc-bg-soft));
 	}
 
+	.assignment-row.row-deleted {
+		background: color-mix(in srgb, var(--qc-danger-soft) 42%, var(--qc-surface));
+	}
+
+	:global(.restore-button.ui-button) {
+		min-width: 112px;
+	}
+
 	.assignment-main strong,
 	.assignment-main span,
 	.assignment-action em {
@@ -309,6 +407,7 @@
 		}
 
 		.hero-grid,
+		.hero-actions,
 		.work-layout,
 		.list-heading,
 		.assignment-row {
@@ -318,6 +417,10 @@
 
 		:global(.hero-grid .ui-link-button) {
 			width: 100%;
+		}
+
+		.hero-actions {
+			align-items: stretch;
 		}
 
 		.assignment-form {

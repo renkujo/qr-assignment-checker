@@ -236,6 +236,34 @@ const setStudentSubmissionStatus = async ({
 	});
 };
 
+const deleteAssignment = async ({ assignmentId, cookie }) => {
+	return fetch(`${appUrl}/app/assignments/${assignmentId}?/deleteAssignment`, {
+		method: 'POST',
+		headers: {
+			accept: 'text/html',
+			'content-type': 'application/x-www-form-urlencoded',
+			cookie
+		},
+		redirect: 'manual'
+	});
+};
+
+const restoreAssignment = async ({ assignmentId, cookie }) => {
+	const formData = new URLSearchParams();
+	formData.set('assignmentId', assignmentId);
+
+	return fetch(`${appUrl}/app/assignments?/restore`, {
+		method: 'POST',
+		headers: {
+			accept: 'text/html',
+			'content-type': 'application/x-www-form-urlencoded',
+			cookie
+		},
+		body: formData,
+		redirect: 'manual'
+	});
+};
+
 const assertStudentImport = async ({ pb, classRecord, cookie }) => {
 	const formData = new URLSearchParams();
 	formData.set(
@@ -331,7 +359,7 @@ const assertCsvExport = async ({ assignmentId, cookie, phase = 'initial' }) => {
 
 	assert(
 		csv.includes('"1","MVP ส่งแล้ว","ส่งแล้ว"') && csv.includes('"สแกน QR"'),
-		'Missing scanned submitted row'
+		`Missing scanned submitted row. CSV: ${csv}`
 	);
 	assert(csv.includes('"2","MVP ยังไม่ส่ง","ยังไม่ส่ง",""'), 'Missing missing row');
 };
@@ -554,6 +582,203 @@ const main = async () => {
 	});
 	assert(statusEvents.totalItems === 4, `Expected 4 audit events, got ${statusEvents.totalItems}`);
 
+	const statusUiResponse = await fetch(`${appUrl}/app/assignments/${fixture.assignment.id}`, {
+		headers: { cookie }
+	});
+	const statusUiHtml = await statusUiResponse.text();
+	assert(statusUiHtml.includes('ยังไม่ได้ส่ง'), 'Missing not-submitted status control');
+	assert(statusUiHtml.includes('ส่งแล้ว'), 'Missing submitted status control');
+	assert(statusUiHtml.includes('ลบใบงาน'), 'Missing delete assignment control');
+	assert(statusUiHtml.includes('<svg'), 'Missing rendered status icons');
+
+	const outsiderPb = new PocketBase(pocketBaseUrl);
+	const outsiderStamp = Date.now();
+	const outsiderEmail = `assignment-outsider-${outsiderStamp}@example.test`;
+	const outsiderPassword = `OutsiderPass-${outsiderStamp}!`;
+	await outsiderPb.collection('users').create({
+		email: outsiderEmail,
+		password: outsiderPassword,
+		passwordConfirm: outsiderPassword,
+		name: 'Assignment Outsider',
+		emailVisibility: true
+	});
+	await outsiderPb.collection('users').authWithPassword(outsiderEmail, outsiderPassword);
+
+	try {
+		await outsiderPb.send('/api/assignment-deletion-status', {
+			method: 'POST',
+			body: {
+				assignmentId: fixture.assignment.id,
+				action: 'delete'
+			}
+		});
+		throw new Error('Cross-teacher assignment delete unexpectedly succeeded');
+	} catch (outsiderError) {
+		assert(
+			outsiderError.status === 403,
+			`Expected cross-teacher delete 403, got ${outsiderError.status}`
+		);
+	}
+
+	try {
+		await pb.collection('assignments').update(fixture.assignment.id, {
+			deleted_at: new Date().toISOString(),
+			deleted_by: fixture.teacher.id
+		});
+		throw new Error('Direct assignment lifecycle update unexpectedly succeeded');
+	} catch (directLifecycleError) {
+		assert(
+			[400, 403, 404].includes(directLifecycleError.status),
+			`Expected direct lifecycle update to be blocked, got ${directLifecycleError.status}`
+		);
+	}
+
+	const deleteResponse = await deleteAssignment({
+		assignmentId: fixture.assignment.id,
+		cookie
+	});
+	assert(
+		deleteResponse.status === 303,
+		`Expected delete redirect 303, got ${deleteResponse.status}`
+	);
+
+	const deletedAssignment = await pb.collection('assignments').getOne(fixture.assignment.id);
+	assert(deletedAssignment.status === 'closed', 'Expected deleted assignment to be closed');
+	assert(deletedAssignment.deleted_at, 'Expected deleted_at after soft delete');
+	assert(deletedAssignment.deleted_by === fixture.teacher.id, 'Expected deleted_by teacher');
+	const repeatedDelete = await pb.send('/api/assignment-deletion-status', {
+		method: 'POST',
+		body: {
+			assignmentId: fixture.assignment.id,
+			action: 'delete'
+		}
+	});
+	assert(repeatedDelete.status === 'unchanged', 'Expected repeated delete to be unchanged');
+
+	try {
+		await outsiderPb.send('/api/assignment-deletion-status', {
+			method: 'POST',
+			body: {
+				assignmentId: fixture.assignment.id,
+				action: 'restore'
+			}
+		});
+		throw new Error('Cross-teacher assignment restore unexpectedly succeeded');
+	} catch (outsiderRestoreError) {
+		assert(
+			outsiderRestoreError.status === 403,
+			`Expected cross-teacher restore 403, got ${outsiderRestoreError.status}`
+		);
+	}
+
+	const activeListResponse = await fetch(`${appUrl}/app/assignments`, {
+		headers: { cookie }
+	});
+	const activeListHtml = await activeListResponse.text();
+	assert(
+		!activeListHtml.includes(fixture.assignment.title),
+		'Deleted assignment leaked into active list'
+	);
+
+	const trashListResponse = await fetch(`${appUrl}/app/assignments?view=trash`, {
+		headers: { cookie }
+	});
+	const trashListHtml = await trashListResponse.text();
+	assert(
+		trashListResponse.status === 200 && trashListHtml.includes(fixture.assignment.title),
+		`Deleted assignment missing from trash. Status: ${trashListResponse.status}. Markers: ${JSON.stringify(
+			{
+				trashHeading: trashListHtml.includes('ใบงานที่ลบ'),
+				emptyTrash: trashListHtml.includes('ถังขยะยังว่าง'),
+				unavailable: trashListHtml.includes('PocketBase ยังไม่พร้อม'),
+				activeHeading: trashListHtml.includes('งานที่ต้องตรวจ')
+			}
+		)}`
+	);
+	assert(trashListHtml.includes('กู้คืน'), 'Missing restore control in trash');
+
+	for (const deletedRoute of [
+		`/app/assignments/${fixture.assignment.id}`,
+		`/app/assignments/${fixture.assignment.id}/scan`,
+		`/app/assignments/${fixture.assignment.id}/export`
+	]) {
+		const deletedRouteResponse = await fetch(`${appUrl}${deletedRoute}`, {
+			headers: { cookie },
+			redirect: 'manual'
+		});
+		assert(
+			deletedRouteResponse.status === 404,
+			`Expected deleted route ${deletedRoute} to return 404, got ${deletedRouteResponse.status}`
+		);
+	}
+
+	const deletedScan = await postScan({
+		assignmentId: fixture.assignment.id,
+		cookie,
+		qrPayload
+	});
+	assert(
+		deletedScan.httpStatus === 400,
+		`Expected deleted scan 400, got ${deletedScan.httpStatus}`
+	);
+
+	const submittedBeforeDeletedManual = await pb.collection('submissions').getFirstListItem(
+		pb.filter('submission_key = {:submissionKey}', {
+			submissionKey: `${fixture.assignment.id}:${fixture.submittedStudent.id}`
+		})
+	);
+	const deletedManual = await setStudentSubmissionStatus({
+		assignmentId: fixture.assignment.id,
+		studentId: fixture.submittedStudent.id,
+		cookie,
+		expectedStatus: 'submitted',
+		expectedUpdatedAt: submittedBeforeDeletedManual.status_updated_at,
+		targetStatus: 'missing'
+	});
+	assert(
+		deletedManual.status === 400 || deletedManual.status === 404,
+		`Expected deleted manual correction 400/404, got ${deletedManual.status}`
+	);
+
+	const restoreResponse = await restoreAssignment({
+		assignmentId: fixture.assignment.id,
+		cookie
+	});
+	assert(
+		restoreResponse.status === 303,
+		`Expected restore redirect 303, got ${restoreResponse.status}`
+	);
+
+	const restoredAssignment = await pb.collection('assignments').getOne(fixture.assignment.id);
+	assert(restoredAssignment.status === 'closed', 'Expected restored assignment to remain closed');
+	assert(!restoredAssignment.deleted_at, 'Expected restored deleted_at to be empty');
+	assert(!restoredAssignment.deleted_by, 'Expected restored deleted_by to be empty');
+	const repeatedRestore = await pb.send('/api/assignment-deletion-status', {
+		method: 'POST',
+		body: {
+			assignmentId: fixture.assignment.id,
+			action: 'restore'
+		}
+	});
+	assert(repeatedRestore.status === 'unchanged', 'Expected repeated restore to be unchanged');
+
+	const restoredDetail = await fetch(`${appUrl}/app/assignments/${fixture.assignment.id}`, {
+		headers: { cookie }
+	});
+	assert(
+		restoredDetail.status === 200,
+		`Expected restored detail 200, got ${restoredDetail.status}`
+	);
+
+	const preservedSubmissions = await pb.collection('submissions').getList(1, 10, {
+		filter: pb.filter('assignment = {:assignmentId}', { assignmentId: fixture.assignment.id })
+	});
+	const preservedEvents = await pb.collection('submission_status_events').getList(1, 20, {
+		filter: pb.filter('assignment = {:assignmentId}', { assignmentId: fixture.assignment.id })
+	});
+	assert(preservedSubmissions.totalItems === 2, 'Soft delete changed submission records');
+	assert(preservedEvents.totalItems === 4, 'Soft delete changed audit events');
+
 	console.log(
 		JSON.stringify(
 			{
@@ -574,7 +799,15 @@ const main = async () => {
 					'manual-revoke-while-closed',
 					'manual-submit-while-closed',
 					'reopen-reactivates-revoked-scan',
-					'submission-audit-events'
+					'submission-audit-events',
+					'status-icon-controls',
+					'assignment-lifecycle-security',
+					'assignment-lifecycle-idempotency',
+					'assignment-soft-delete',
+					'deleted-route-guards',
+					'assignment-trash-list',
+					'assignment-restore-closed',
+					'soft-delete-preserves-history'
 				]
 			},
 			null,

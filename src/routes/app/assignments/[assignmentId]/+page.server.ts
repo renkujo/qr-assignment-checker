@@ -1,6 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getAssignment, updateAssignmentStatus } from '$lib/assignments';
+import {
+	getAssignment,
+	updateAssignmentDeletionStatus,
+	updateAssignmentStatus
+} from '$lib/assignments';
 import type { AssignmentStatus } from '$lib/assignments';
 import { getAssignmentSummary, updateSubmissionStatus } from '$lib/submissions';
 import type { ManualSubmissionTargetStatus } from '$lib/submissions';
@@ -123,5 +127,25 @@ export const actions: Actions = {
 				message: statusError instanceof Error ? statusError.message : 'ปรับสถานะการส่งงานไม่สำเร็จ'
 			});
 		}
+	},
+	deleteAssignment: async ({ locals, params }) => {
+		if (!locals.user) {
+			redirect(303, `/login?redirectTo=/app/assignments/${params.assignmentId}`);
+		}
+
+		try {
+			await updateAssignmentDeletionStatus({
+				pb: locals.pb,
+				assignmentId: params.assignmentId,
+				action: 'delete'
+			});
+		} catch {
+			return fail(400, {
+				formName: 'deleteAssignment',
+				message: 'ลบใบงานไม่สำเร็จ'
+			});
+		}
+
+		redirect(303, '/app/assignments?view=trash&deleted=1');
 	}
 };

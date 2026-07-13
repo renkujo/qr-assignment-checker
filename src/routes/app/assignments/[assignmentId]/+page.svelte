@@ -1,4 +1,8 @@
 <script lang="ts">
+	import Icon from '@iconify/svelte/dist/OfflineIcon.svelte';
+	import checkIconModule from '@iconify/icons-lucide/check.js';
+	import trashIconModule from '@iconify/icons-lucide/trash-2.js';
+	import xIconModule from '@iconify/icons-lucide/x.js';
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
@@ -24,6 +28,16 @@
 	let statusErrorMessage = $state('');
 	let selectedStatusChange = $state<IStudentStatusChange | null>(null);
 	let statusFormElement = $state<HTMLFormElement>();
+	let deleteDialogOpen = $state(false);
+	let deleteFormElement = $state<HTMLFormElement>();
+
+	type IIconifyIconData = typeof checkIconModule;
+	const resolveIconData = (
+		iconModule: IIconifyIconData | { default: IIconifyIconData }
+	): IIconifyIconData => ('default' in iconModule ? iconModule.default : iconModule);
+	const checkIcon = resolveIconData(checkIconModule);
+	const trashIcon = resolveIconData(trashIconModule);
+	const xIcon = resolveIconData(xIconModule);
 
 	const eventsEndpoint = $derived(
 		resolve('/app/assignments/[assignmentId]/events', { assignmentId: data.assignment.id })
@@ -81,6 +95,10 @@
 		if (!selectedStatusChange || statusPending) return;
 
 		statusFormElement?.requestSubmit();
+	};
+
+	const confirmDeleteAssignment = (): void => {
+		deleteFormElement?.requestSubmit();
 	};
 
 	const enhanceStatusForm: SubmitFunction = () => {
@@ -280,6 +298,7 @@
 									disabled={row.status === 'missing' || statusPending}
 									onclick={() => openStatusDialog(row, 'missing')}
 								>
+									<Icon icon={xIcon} width="18" height="18" aria-hidden="true" />
 									ยังไม่ได้ส่ง
 								</button>
 								<button
@@ -289,6 +308,7 @@
 									disabled={row.status === 'submitted' || statusPending}
 									onclick={() => openStatusDialog(row, 'submitted')}
 								>
+									<Icon icon={checkIcon} width="18" height="18" aria-hidden="true" />
 									ส่งแล้ว
 								</button>
 							</div>
@@ -300,6 +320,18 @@
 				{/each}
 			</div>
 		{/if}
+	</Card>
+
+	<Card class="danger-zone" aria-labelledby="danger-zone-title">
+		<div>
+			<p class="section-kicker danger-kicker">จัดการใบงาน</p>
+			<h2 id="danger-zone-title">ลบใบงาน</h2>
+			<span>ย้ายไปถังขยะโดยไม่ลบประวัติการส่งงาน และสามารถกู้คืนได้</span>
+		</div>
+		<Button type="button" variant="danger" size="lg" onclick={() => (deleteDialogOpen = true)}>
+			<Icon icon={trashIcon} width="18" height="18" aria-hidden="true" />
+			ลบใบงาน
+		</Button>
 	</Card>
 
 	<form
@@ -319,6 +351,26 @@
 		<input type="hidden" name="targetStatus" value={selectedStatusChange?.targetStatus || ''} />
 	</form>
 
+	<form
+		bind:this={deleteFormElement}
+		method="POST"
+		action="?/deleteAssignment"
+		class="delete-assignment-form"
+	></form>
+
+	{#snippet statusConfirmIcon()}
+		<Icon
+			icon={selectedStatusChange?.targetStatus === 'submitted' ? checkIcon : xIcon}
+			width="18"
+			height="18"
+			aria-hidden="true"
+		/>
+	{/snippet}
+
+	{#snippet deleteConfirmIcon()}
+		<Icon icon={trashIcon} width="18" height="18" aria-hidden="true" />
+	{/snippet}
+
 	<AlertDialog
 		bind:open={statusDialogOpen}
 		title={statusDialogTitle}
@@ -328,6 +380,7 @@
 			? 'ยืนยันส่งแล้ว'
 			: 'เปลี่ยนเป็นยังไม่ได้ส่ง'}
 		confirmVariant={selectedStatusChange?.targetStatus === 'submitted' ? 'primary' : 'danger'}
+		confirmIcon={statusConfirmIcon}
 		pending={statusPending}
 		pendingLabel="กำลังบันทึก…"
 		closeOnConfirm={false}
@@ -342,6 +395,22 @@
 		{#if statusErrorMessage}
 			<Alert variant="danger" class="status-dialog-error">{statusErrorMessage}</Alert>
 		{/if}
+	</AlertDialog>
+
+	<AlertDialog
+		bind:open={deleteDialogOpen}
+		title="ลบใบงานนี้?"
+		description="ใบงานจะถูกย้ายไปถังขยะ ประวัติการส่งงานจะไม่หาย และสามารถกู้คืนได้"
+		cancelLabel="ยกเลิก"
+		confirmLabel="ย้ายไปถังขยะ"
+		confirmVariant="danger"
+		confirmIcon={deleteConfirmIcon}
+		onconfirm={confirmDeleteAssignment}
+	>
+		<div class="delete-dialog-assignment">
+			<strong>{data.assignment.title}</strong>
+			<span>ส่งแล้ว {data.summary.submittedCount} จาก {data.summary.rows.length} คน</span>
+		</div>
 	</AlertDialog>
 </main>
 
@@ -583,7 +652,11 @@
 	}
 
 	.status-segmented button {
-		min-height: 36px;
+		display: inline-flex;
+		min-height: 44px;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
 		border: 1px solid transparent;
 		border-radius: var(--qc-radius-sm);
 		background: transparent;
@@ -600,14 +673,15 @@
 		color: var(--qc-text);
 	}
 
-	.status-segmented button.is-active {
-		border-color: color-mix(in srgb, var(--qc-primary) 24%, var(--qc-border));
-		background: var(--qc-surface);
-		color: var(--qc-text);
+	.status-segmented button:first-child.is-active {
+		border-color: color-mix(in srgb, var(--qc-warning) 38%, var(--qc-border));
+		background: var(--qc-warning-soft);
+		color: color-mix(in srgb, var(--qc-warning) 78%, var(--qc-text));
 	}
 
 	.status-segmented button:last-child.is-active {
-		border-color: color-mix(in srgb, var(--qc-success) 28%, var(--qc-border));
+		border-color: color-mix(in srgb, var(--qc-primary) 24%, var(--qc-border));
+		background: var(--qc-surface-green);
 		color: var(--qc-success);
 	}
 
@@ -617,6 +691,36 @@
 
 	.manual-status-form {
 		display: none;
+	}
+
+	.delete-assignment-form {
+		display: none;
+	}
+
+	:global(.danger-zone.ui-card) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 18px;
+		margin-top: 16px;
+		border-color: color-mix(in srgb, var(--qc-danger) 24%, var(--qc-border));
+		border-radius: var(--qc-radius-md);
+		padding: 18px;
+	}
+
+	:global(.danger-zone.ui-card) h2 {
+		margin: 0;
+	}
+
+	:global(.danger-zone.ui-card) span {
+		display: block;
+		margin-top: 5px;
+		color: var(--qc-muted);
+		line-height: 1.5;
+	}
+
+	.danger-kicker {
+		color: var(--qc-danger);
 	}
 
 	.status-dialog-student {
@@ -636,6 +740,21 @@
 
 	.status-dialog-student strong {
 		color: var(--qc-text);
+	}
+
+	.delete-dialog-assignment {
+		display: grid;
+		gap: 4px;
+		margin-top: 14px;
+		border: 1px solid color-mix(in srgb, var(--qc-danger) 20%, var(--qc-border));
+		border-radius: var(--qc-radius-md);
+		background: var(--qc-danger-soft);
+		padding: 12px;
+	}
+
+	.delete-dialog-assignment strong,
+	.delete-dialog-assignment span {
+		display: block;
 	}
 
 	:global(.status-dialog-error.ui-alert) {
@@ -737,6 +856,14 @@
 
 		.status-control {
 			justify-items: stretch;
+		}
+
+		:global(.danger-zone.ui-card) {
+			display: grid;
+		}
+
+		:global(.danger-zone.ui-card .ui-button) {
+			width: 100%;
 		}
 	}
 </style>

@@ -128,6 +128,8 @@ Scanner slice status:
 - duplicate submissions return `ส่งแล้ว` instead of creating another record
 - direct REST create for `submissions` is blocked by collection rule, leaving the custom endpoint as the write path
 - assignment summary can close/open receiving work; closed assignments block scans with Thai copy
+- assignment summary uses icon-plus-text manual status controls with confirmation
+- assignments support soft delete, trash listing, and closed-state restore without deleting history
 
 Route:
 

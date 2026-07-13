@@ -7,6 +7,7 @@
 		title: string;
 		description?: string;
 		children?: Snippet;
+		confirmIcon?: Snippet;
 		cancelLabel?: string;
 		confirmLabel?: string;
 		pendingLabel?: string;
@@ -23,6 +24,7 @@
 		title,
 		description,
 		children,
+		confirmIcon,
 		cancelLabel = 'Cancel',
 		confirmLabel = 'Confirm',
 		pendingLabel = 'Saving…',
@@ -170,6 +172,7 @@
 					disabled={pending}
 					onclick={confirm}
 				>
+					{#if confirmIcon}{@render confirmIcon()}{/if}
 					{pending ? pendingLabel : confirmLabel}
 				</Button>
 			</div>

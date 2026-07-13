@@ -34,6 +34,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		gap: 8px;
 		border: 1px solid transparent;
 		border-radius: var(--qc-radius-md);
 		padding: 0 16px;
@@ -46,7 +47,7 @@
 	}
 
 	.ui-button--md {
-		min-height: 40px;
+		min-height: 44px;
 	}
 
 	.ui-button--lg {

@@ -94,6 +94,8 @@ Stores assignment/check session metadata.
 | `due_date`   | date                  | no       | Optional due date                           |
 | `status`     | select                | yes      | `draft`, `active`, `closed`                 |
 | `created_by` | relation -> `users`   | yes      | Teacher who created it                      |
+| `deleted_at` | date                  | no       | Soft-delete timestamp                       |
+| `deleted_by` | relation -> `users`   | no       | Teacher who moved it to trash               |
 
 Indexes / constraints:
 
@@ -101,12 +103,28 @@ Indexes / constraints:
 - index `class_code`
 - index `status`
 - index `created_by`
+- index `deleted_at`
 
 Rule intent:
 
 - Authenticated teacher can list/view assignments in own classes.
 - Authenticated teacher can create/update assignments in own classes.
-- New submissions should be blocked when assignment status is `closed`.
+- New submissions should be blocked when assignment status is not `active`.
+- Deleted assignments are hidden from normal lists and blocked from summary, scan, export, and manual correction.
+- Direct REST updates cannot write `deleted_at` or `deleted_by`; the server-owned lifecycle endpoint owns delete/restore.
+
+### Assignment soft-delete contract
+
+Authenticated teachers use `POST /api/assignment-deletion-status` with:
+
+```txt
+assignmentId + action(delete|restore)
+```
+
+Delete sets `status = closed`, `deleted_at`, and `deleted_by` in one transaction. Restore clears the
+deletion fields but deliberately keeps `status = closed`, so scanner access never reopens
+automatically. Submissions and `submission_status_events` are never removed. The normal assignment
+list filters to `deleted_at = ""`; the trash view filters to `deleted_at != ""`.
 
 ### `submissions`
 
@@ -237,3 +255,7 @@ The first migration creates the base collections and indexes. A follow-up migrat
 Migration `1783351000_add_submission_status_audit.js` adds current `submitted`/`revoked` state,
 migrates existing records to `submitted`, and creates the append-only `submission_status_events`
 collection. The same hook file owns both scan and manual status endpoints.
+
+Migration `1783352000_add_assignment_soft_delete.js` adds server-owned `deleted_at`/`deleted_by`,
+indexes trash filtering, and prevents direct REST lifecycle mutation. The lifecycle endpoint in
+`pocketbase/pb_hooks/main.pb.js` owns delete and restore transitions.

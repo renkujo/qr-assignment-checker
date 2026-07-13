@@ -70,12 +70,22 @@ Fields:
 - `due_date` date optional
 - `status` select: `draft`, `active`, `closed`
 - `created_by` relation -> users
+- `deleted_at` date optional
+- `deleted_by` relation -> users optional
 
 Indexes:
 
 - index `class`
 - index `class_code`
 - index `status`
+- index `deleted_at`
+
+การลบ assignment เป็น soft delete เท่านั้น:
+
+- delete: ตั้ง `status = closed` พร้อม `deleted_at` และ `deleted_by`
+- restore: ล้าง deletion fields แต่คง `status = closed`
+- ไม่ลบ submissions หรือ audit events
+- assignment ที่ถูกลบต้องเข้า summary, scan, export และ manual correction ไม่ได้
 
 ### submissions
 

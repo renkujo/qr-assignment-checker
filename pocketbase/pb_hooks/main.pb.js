@@ -97,6 +97,10 @@ routerAdd(
 				forbidden('assignment does not belong to the current teacher');
 			}
 
+			if (assignment.getString('deleted_at')) {
+				bad('assignment is deleted');
+			}
+
 			const student = requiredRecord(txApp, 'students', studentId, 'student');
 			validateAssignmentStudent(assignment, student);
 
@@ -197,6 +201,107 @@ routerAdd(
 
 routerAdd(
 	'POST',
+	'/api/assignment-deletion-status',
+	function (e) {
+		function toText(value) {
+			return value === undefined || value === null ? '' : String(value).trim();
+		}
+
+		function bad(message) {
+			throw e.badRequestError(message, {});
+		}
+
+		function forbidden(message) {
+			throw e.forbiddenError(message, {});
+		}
+
+		function requiredRecord(app, collectionName, id, fieldName) {
+			if (!id) bad(`${fieldName} is required`);
+
+			try {
+				return app.findRecordById(collectionName, id);
+			} catch (_) {
+				bad(`${fieldName} is invalid`);
+			}
+		}
+
+		const auth = e.auth;
+
+		if (!auth || !auth.id) {
+			throw e.unauthorizedError('Authentication is required', {});
+		}
+
+		const body = e.requestInfo().body || {};
+		const assignmentId = toText(body.assignmentId);
+		const action = toText(body.action);
+
+		if (!/^[a-z0-9]{15}$/.test(assignmentId)) {
+			bad('assignment id is invalid');
+		}
+
+		if (action !== 'delete' && action !== 'restore') {
+			bad('action must be delete or restore');
+		}
+
+		let result;
+
+		$app.runInTransaction((txApp) => {
+			const assignment = requiredRecord(txApp, 'assignments', assignmentId, 'assignment');
+			const classRecord = requiredRecord(txApp, 'classes', assignment.getString('class'), 'class');
+
+			if (classRecord.getString('teacher') !== auth.id) {
+				forbidden('assignment does not belong to the current teacher');
+			}
+
+			const deletedAt = assignment.getString('deleted_at');
+
+			if ((action === 'delete' && deletedAt) || (action === 'restore' && !deletedAt)) {
+				result = {
+					status: 'unchanged',
+					action,
+					assignmentId: assignment.id,
+					deletedAt,
+					message: action === 'delete' ? 'ใบงานอยู่ในถังขยะแล้ว' : 'ใบงานถูกกู้คืนแล้ว'
+				};
+				return;
+			}
+
+			if (action === 'delete') {
+				const changedAt = new Date().toISOString();
+				assignment.set('status', 'closed');
+				assignment.set('deleted_at', changedAt);
+				assignment.set('deleted_by', auth.id);
+				txApp.save(assignment);
+				result = {
+					status: 'updated',
+					action,
+					assignmentId: assignment.id,
+					deletedAt: changedAt,
+					message: 'ย้ายใบงานไปถังขยะแล้ว'
+				};
+				return;
+			}
+
+			assignment.set('status', 'closed');
+			assignment.set('deleted_at', '');
+			assignment.set('deleted_by', '');
+			txApp.save(assignment);
+			result = {
+				status: 'updated',
+				action,
+				assignmentId: assignment.id,
+				deletedAt: '',
+				message: 'กู้คืนใบงานแล้ว ใบงานยังคงปิดรับอยู่'
+			};
+		});
+
+		return e.json(200, result);
+	},
+	$apis.requireAuth()
+);
+
+routerAdd(
+	'POST',
 	'/api/scan-submissions',
 	function (e) {
 		function toText(value) {
@@ -278,6 +383,10 @@ routerAdd(
 
 			if (classRecord.getString('teacher') !== auth.id) {
 				forbidden('assignment does not belong to the current teacher');
+			}
+
+			if (assignment.getString('deleted_at')) {
+				bad('assignment is deleted');
 			}
 
 			if (assignment.getString('status') !== 'active') {

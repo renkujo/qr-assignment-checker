@@ -12,6 +12,8 @@ export interface IAssignmentRecord {
 	due_date: string;
 	status: AssignmentStatus;
 	created_by: string;
+	deleted_at: string;
+	deleted_by: string;
 }
 
 export interface IAssignmentListItem {
@@ -22,6 +24,9 @@ export interface IAssignmentListItem {
 	title: string;
 	dueDate: string;
 	status: AssignmentStatus;
+	deletedAt: string;
+	deletedBy: string;
+	isDeleted: boolean;
 }
 
 export interface IListAssignmentsInput {
@@ -42,6 +47,22 @@ export interface IGetAssignmentInput {
 	assignmentId: string;
 }
 
+export type AssignmentDeletionAction = 'delete' | 'restore';
+
+export interface IUpdateAssignmentDeletionStatusInput {
+	pb: PocketBase;
+	assignmentId: string;
+	action: AssignmentDeletionAction;
+}
+
+export interface IUpdateAssignmentDeletionStatusResult {
+	status: 'updated' | 'unchanged';
+	action: AssignmentDeletionAction;
+	assignmentId: string;
+	deletedAt: string;
+	message: string;
+}
+
 export interface IUpdateAssignmentStatusInput {
 	pb: PocketBase;
 	assignmentId: string;
@@ -56,7 +77,10 @@ const mapAssignmentRecord = (assignment: IAssignmentRecord): IAssignmentListItem
 		subject: assignment.subject,
 		title: assignment.title,
 		dueDate: assignment.due_date,
-		status: assignment.status
+		status: assignment.status,
+		deletedAt: assignment.deleted_at,
+		deletedBy: assignment.deleted_by,
+		isDeleted: Boolean(assignment.deleted_at)
 	};
 };
 
@@ -65,7 +89,19 @@ export const listAssignments = async ({
 	classId
 }: IListAssignmentsInput): Promise<IAssignmentListItem[]> => {
 	const assignments = await pb.collection('assignments').getFullList<IAssignmentRecord>({
-		filter: pb.filter('class = {:classId}', { classId })
+		filter: pb.filter('class = {:classId} && deleted_at = ""', { classId })
+	});
+
+	return assignments.map(mapAssignmentRecord);
+};
+
+export const listDeletedAssignments = async ({
+	pb,
+	classId
+}: IListAssignmentsInput): Promise<IAssignmentListItem[]> => {
+	const assignments = await pb.collection('assignments').getFullList<IAssignmentRecord>({
+		filter: pb.filter('class = {:classId} && deleted_at != ""', { classId }),
+		sort: '-deleted_at'
 	});
 
 	return assignments.map(mapAssignmentRecord);
@@ -97,7 +133,25 @@ export const getAssignment = async ({
 }: IGetAssignmentInput): Promise<IAssignmentListItem> => {
 	const assignment = await pb.collection('assignments').getOne<IAssignmentRecord>(assignmentId);
 
+	if (assignment.deleted_at) {
+		throw new Error('Assignment is deleted');
+	}
+
 	return mapAssignmentRecord(assignment);
+};
+
+export const updateAssignmentDeletionStatus = async ({
+	pb,
+	assignmentId,
+	action
+}: IUpdateAssignmentDeletionStatusInput): Promise<IUpdateAssignmentDeletionStatusResult> => {
+	return pb.send<IUpdateAssignmentDeletionStatusResult>('/api/assignment-deletion-status', {
+		method: 'POST',
+		body: {
+			assignmentId,
+			action
+		}
+	});
 };
 
 export const updateAssignmentStatus = async ({

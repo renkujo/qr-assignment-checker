@@ -114,6 +114,7 @@ Then open the Admin UI at `http://127.0.0.1:8090/_/`.
 - `/app/students` — student roster and QR payload preview
 - `/app/students/print` — printable QR cards
 - `/app/assignments` — assignment list and create form
+- `/app/assignments?view=trash` — deleted assignment trash and restore controls
 - `/app/assignments/[assignmentId]` — live submitted/missing summary, close/reopen assignment, CSV export link
 - `/app/assignments/[assignmentId]/export` — CSV export for Excel
 - `/app/assignments/[assignmentId]/scan` — mobile QR scanner page
@@ -122,3 +123,7 @@ Teachers can correct each student's status from the assignment summary. Every ch
 confirmation dialog, works even after the assignment is closed, preserves the stable submission key,
 and records an append-only audit event. A student changed back to missing can scan the same QR again
 after the assignment is reopened.
+
+Status controls use explicit `✕ ยังไม่ได้ส่ง` and `✓ ส่งแล้ว` icon-plus-text choices for low-tech
+clarity. Assignments can be moved to trash from a separate danger zone; deletion closes and hides the
+assignment without removing submission history. Restored assignments always return as closed.

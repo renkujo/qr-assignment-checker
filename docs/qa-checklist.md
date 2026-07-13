@@ -60,6 +60,11 @@ Release MVP only when:
 - Teacher status correction works while the assignment is closed without reopening scanner access.
 - Revoked student can scan again after the assignment is reopened and the same submission record is reactivated.
 - Summary/realtime/CSV reflect manual status corrections and audit source.
+- Submission controls show explicit X/check icons plus text; current state is not communicated by color alone.
+- Delete confirmation shows assignment title and submitted/total count.
+- Soft-deleted assignment disappears from the normal list and appears in trash.
+- Deleted assignment blocks summary, scanner, export, and manual status correction.
+- Restoring an assignment preserves submissions/audit events and returns it as closed.
 - assignment create works
 - scanner works on real mobile browser over HTTPS
 - duplicate prevention works at DB level

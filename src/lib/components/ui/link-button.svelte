@@ -30,6 +30,7 @@
 		width: fit-content;
 		align-items: center;
 		justify-content: center;
+		gap: 8px;
 		border: 1px solid transparent;
 		border-radius: var(--qc-radius-md);
 		padding: 0 16px;
@@ -41,7 +42,7 @@
 	}
 
 	.ui-link-button--md {
-		min-height: 40px;
+		min-height: 44px;
 	}
 
 	.ui-link-button--lg {
@@ -72,7 +73,7 @@
 	}
 
 	.ui-link-button--ghost {
-		min-height: auto;
+		min-height: 44px;
 		border-color: transparent;
 		background: transparent;
 		padding: 0;
