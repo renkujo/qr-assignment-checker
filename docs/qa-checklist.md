@@ -12,7 +12,12 @@
 ## Scan behavior
 
 - valid QR creates one submission
+- scanner remains active after a completed scan and accepts the next student's QR without pressing start again
+- pending scan shows a loading overlay and blocks another request until the current request settles
+- completed scan shows a success, duplicate, or error toast while the latest-result card remains visible
 - same QR scanned repeatedly creates only one submission
+- same QR held inside the camera frame is suppressed during the client cooldown
+- a different student's QR can be scanned immediately after the previous request settles
 - duplicate scan shows already submitted state
 - invalid QR creates no submission
 - QR from another class is rejected

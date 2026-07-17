@@ -45,6 +45,7 @@
 		"@iconify/svelte": "5.2.2",
 		"html5-qrcode": "2.3.8",
 		"pocketbase": "0.27.0",
-		"qrcode": "1.5.4"
+		"qrcode": "1.5.4",
+		"svelte-sonner": "1.1.1"
 	}
 }

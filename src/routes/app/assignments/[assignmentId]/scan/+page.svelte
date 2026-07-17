@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import { Alert, Badge, Button, Card, LinkButton } from '$lib/components/ui';
+	import { rememberScanPayload } from '$lib/qr/scan-payload-cooldown';
 	import type { Html5Qrcode } from 'html5-qrcode';
+	import { toast } from 'svelte-sonner';
 	import type { IScanSubmissionResult } from '$lib/submissions';
 
 	let { data } = $props();
@@ -12,8 +15,8 @@
 	let scannerRunning = $state(false);
 	let pending = $state(false);
 	let cameraError = $state('');
-	let lastPayload = $state('');
 	let result = $state<IScanSubmissionResult | null>(null);
+	const recentPayloads = new SvelteMap<string, number>();
 
 	const scanEndpoint = $derived(
 		resolve('/app/assignments/[assignmentId]/scan/submit', { assignmentId: data.assignment.id })
@@ -53,20 +56,32 @@
 		}
 	};
 
+	const showScanToast = (scanResult: IScanSubmissionResult) => {
+		const description = scanResult.studentName
+			? `เลขที่ ${scanResult.studentNo} · ${scanResult.studentName}`
+			: undefined;
+
+		if (scanResult.status === 'submitted') {
+			toast.success(scanResult.message, { description });
+			return;
+		}
+
+		if (scanResult.status === 'duplicate') {
+			toast.warning(scanResult.message, { description });
+			return;
+		}
+
+		toast.error(scanResult.message, { description });
+	};
+
 	const submitScan = async (qrPayload: string) => {
-		if (pending || qrPayload === lastPayload) {
+		if (pending || !rememberScanPayload({ recentPayloads, payload: qrPayload })) {
 			return;
 		}
 
 		pending = true;
-		lastPayload = qrPayload;
-		result = {
-			status: 'invalid',
-			message: 'กำลังบันทึกผลสแกน...'
-		};
 
 		try {
-			await stopScanner();
 			const response = await fetch(scanEndpoint, {
 				method: 'POST',
 				headers: {
@@ -76,16 +91,15 @@
 			});
 			const payload = (await response.json()) as IScanSubmissionResult;
 			result = payload;
+			showScanToast(payload);
 		} catch {
 			result = {
 				status: 'invalid',
 				message: 'เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง'
 			};
+			showScanToast(result);
 		} finally {
 			pending = false;
-			setTimeout(() => {
-				lastPayload = '';
-			}, 1800);
 		}
 	};
 
@@ -126,6 +140,7 @@
 		void startScanner();
 
 		return () => {
+			recentPayloads.clear();
 			void stopScanner();
 		};
 	});
@@ -152,16 +167,22 @@
 						.length}
 				</p>
 			</div>
-			<Badge variant={scannerRunning ? 'success' : pending ? 'info' : 'muted'}>
-				{scannerRunning ? 'กล้องทำงาน' : pending ? 'กำลังบันทึก' : 'พร้อมเริ่ม'}
+			<Badge variant={pending ? 'info' : scannerRunning ? 'success' : 'muted'}>
+				{pending ? 'กำลังบันทึก' : scannerRunning ? 'สแกนต่อเนื่อง' : 'พร้อมเริ่ม'}
 			</Badge>
 		</div>
 	</header>
 
 	<section class="scan-layout">
 		<Card class="scanner-card">
-			<div class="scanner-frame">
+			<div class="scanner-frame" aria-busy={pending}>
 				<div id="qr-reader" class:scanner-ready={scannerReady}></div>
+				{#if pending}
+					<div class="scan-loading" role="status" aria-live="polite">
+						<span class="scan-spinner" aria-hidden="true"></span>
+						<strong>กำลังบันทึกผลสแกน…</strong>
+					</div>
+				{/if}
 			</div>
 
 			{#if cameraError}
@@ -198,7 +219,7 @@
 			{:else}
 				<Badge variant="info">รอ QR</Badge>
 				<strong>ถือ QR ให้อยู่ในกรอบ</strong>
-				<span>ระบบจะหยุดกล้องระหว่างบันทึก เพื่อกันสแกนซ้ำโดยไม่ได้ตั้งใจ</span>
+				<span>เมื่อบันทึกเสร็จ ระบบจะพร้อมรับ QR คนถัดไปโดยอัตโนมัติ</span>
 			{/if}
 		</Card>
 	</section>
@@ -269,9 +290,45 @@
 	}
 
 	.scanner-frame {
+		position: relative;
 		overflow: hidden;
 		border-radius: 18px;
 		background: #101820;
+	}
+
+	.scan-loading {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-content: center;
+		justify-items: center;
+		gap: 12px;
+		background: rgb(16 24 32 / 72%);
+		color: #ffffff;
+		text-align: center;
+		pointer-events: none;
+		backdrop-filter: blur(2px);
+	}
+
+	.scan-spinner {
+		width: 34px;
+		height: 34px;
+		border: 3px solid rgb(255 255 255 / 30%);
+		border-top-color: #ffffff;
+		border-radius: 999px;
+		animation: scan-spin 0.7s linear infinite;
+	}
+
+	@keyframes scan-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.scan-spinner {
+			animation-duration: 1.4s;
+		}
 	}
 
 	#qr-reader {
